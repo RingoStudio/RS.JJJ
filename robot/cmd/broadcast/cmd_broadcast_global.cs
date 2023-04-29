@@ -1,8 +1,12 @@
 ﻿using Org.BouncyCastle.Utilities;
 using RS.Snail.JJJ.boot;
 using RS.Snail.JJJ.clone;
+using RS.Snail.JJJ.robot.cmd.broadcast;
+using RS.Snail.JJJ.robot.include;
+using RS.Tools.Common.Enums;
 using RS.Tools.Common.Utils;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
@@ -11,39 +15,47 @@ using System.Threading.Tasks;
 
 namespace RS.Snail.JJJ.robot.cmd.misc
 {
-    [attribute.CmdClass]
-    internal class cmd_broadcast_global
+    internal class cmd_broadcast_global : ICMD
     {
-        public const string Instrus = "全局广播";
-        public const string Tag = "cmd_broadcast_global";
-        public const include.ChatScene EnableScene = include.ChatScene.All;
-        public const include.UserRole MinRole = include.UserRole.ADMINISTRATOR;
-        public const RS.Tools.Common.Enums.WechatMessageType AcceptMessageType = Tools.Common.Enums.WechatMessageType.Text;
+        public Context _context { get; set; }
+        public cmd_broadcast_global(Context context)
+        {
+            _context = context;
+        }
+        public List<string> Commands { get; } = new List<string> { "全局广播" };
+        public List<string> CommandsJP { get => Commands.Select(a => Pinyin.GetInitials(a).ToLower()).ToList(); }
+        public List<string> CommandsQP { get => Commands.Select(a => Pinyin.GetPinyin(a).ToLower()).ToList(); }
+        public string Tag { get; } = "cmd_broadcast_global";
+        public ChatScene EnableScene { get; } = include.ChatScene.All;
+        public UserRole MinRole { get; } = include.UserRole.ADMINISTRATOR;
+        public WechatMessageType AcceptMessageType { get; } = Tools.Common.Enums.WechatMessageType.Text;
+        
         private static string _continueTag = "cmd_broadcast_continue";
         private static int _maxCount = 1;
         private static int _maxLength = 300;
-        [attribute.Cmd(Name: Tag, instru: Instrus, enableScene: (int)EnableScene, minRole: (int)MinRole, acceptType: (int)AcceptMessageType)]
-        public static void Do(Context context, Message msg)
+        private ConcurrentDictionary<string, BroadCast> _broadCasts = new();
+        async public Task Do(Message msg)
         {
             try
             {
-                context.CommunicateM.UnregistWaitMessageRequest(msg.Self, msg.Sender, msg.WXID, _continueTag);
+                _context.CommunicateM.UnregistWaitMessageRequest(msg.Self, msg.Sender, msg.WXID, _continueTag);
                 var arr = msg.ExplodeContent;
                 if (arr.Length < 2) return;
                 var instru = arr.First();
-                var texts = new List<string> { msg.Content.Substring(instru.Length).Trim() };
-                var images = new List<string>();
-                var files = new List<string>();
+                var bc = new BroadCast(msg);
+                bc.Content.Add(msg.Content.Substring(instru.Length).Trim());
+                if (_broadCasts.ContainsKey(bc.ID)) _broadCasts[bc.ID] = bc;
+                else _broadCasts.TryAdd(bc.ID, bc);
 
-                context.WechatM.SendAtText("请发送\"确定\"立即向本服务器上所有唧唧叽的所有群发出以上广播内容。\n" +
+                _context.WechatM.SendAtText("请发送\"确定\"立即向绑定俱乐部的群发出以上广播内容。\n" +
                                            "若想要添加文本/文件/图片，请在此发送。\n" +
-                                           $"你最多可以发送不超过{_maxLength}字的文本，和最多{_maxCount}个附件。\n" +
+                                           "你最多可以发送不超过500字的文本，和最多3个附件。\n" +
                                            "若想终止以上广播，请发送\"取消\"。\n" +
                                            "以上操作20秒内有效，超时未回复将自动终止发送。",
                                            new List<string> { msg.WXID },
                                            msg.Self,
                                            msg.Sender);
-                Loops(context, msg, texts, images, files);
+                Loops(msg);
             }
             catch (Exception ex)
             {
@@ -51,7 +63,7 @@ namespace RS.Snail.JJJ.robot.cmd.misc
             }
         }
 
-        private static string AttackDesc(int textLength, int attachCount)
+        private string AttackDesc(int textLength, int attachCount)
         {
             var descs = new List<string>();
             if (textLength < _maxLength) descs.Add($"文本({textLength}/{_maxLength})");
@@ -67,177 +79,193 @@ namespace RS.Snail.JJJ.robot.cmd.misc
         /// <param name="texts"></param>
         /// <param name="images"></param>
         /// <param name="files"></param>
-        private static void Loops(Context context, Message msg, List<string> texts, List<string> images, List<string> files)
+        private void Loops(Message msg)
         {
 
             try
             {
-                context.CommunicateM.RegistWaitMessageRequest(msg.Self, msg.Sender, msg.WXID,
-                                                            new Action<Message>((_msg) =>
-                                                            {
-                                                                try
-                                                                {
-                                                                    var attachCount = files.Count + images.Count;
-                                                                    var textLength = texts.Select((a) => a.Length).Sum();
-                                                                    if (_msg.Type == Tools.Common.Enums.WechatMessageType.Text)
-                                                                    {
-                                                                        if (_msg.Content == "取消") return;
-                                                                        else if (_msg.Content == "确定")
-                                                                        {
-                                                                            SendBroadCasts(context, _msg, texts, images, files);
-                                                                            return;
-                                                                        }
-                                                                        else
-                                                                        {
-                                                                            var text = _msg.Content.Trim();
-                                                                            if (textLength + text.Length >= 500)
-                                                                            {
-                                                                                context.WechatM.SendAtText("因文本长度超长，内容增加失败。\n" +
-                                                                                                        "请发送\"确定\"立即发出以上广播内容。\n" +
-                                                                                                        AttackDesc(textLength, attachCount) +
-                                                                                                        "若想终止以上广播，请发送\"取消\"。\n" +
-                                                                                                        "以上操作20秒内有效，超时未回复将自动终止发送。",
-                                                                                                        new List<string> { _msg.WXID },
-                                                                                                        _msg.Self,
-                                                                                                        _msg.Sender);
-                                                                                Loops(context, _msg, texts, images, files);
-                                                                            }
-                                                                            else
-                                                                            {
-                                                                                texts.Add(text);
-                                                                                context.WechatM.SendAtText("成功接收文本。\n" +
-                                                                                                        "请发送\"确定\"立即发出以上广播内容。\n" +
-                                                                                                        AttackDesc(textLength, attachCount) +
-                                                                                                        "若想终止以上广播，请发送\"取消\"。\n" +
-                                                                                                        "以上操作20秒内有效，超时未回复将自动终止发送。",
-                                                                                                        new List<string> { _msg.WXID },
-                                                                                                        _msg.Self,
-                                                                                                        _msg.Sender);
-                                                                                Loops(context, _msg, texts, images, files);
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                    else if (_msg.Type == Tools.Common.Enums.WechatMessageType.File)
-                                                                    {
-                                                                        if (attachCount > _maxCount)
-                                                                        {
-                                                                            context.WechatM.SendAtText($"附件数量已经达到{_maxCount}，无法继续添加。\n" +
-                                                                                                        "请发送\"确定\"立即发出以上广播内容。\n" +
-                                                                                                        AttackDesc(textLength, attachCount) +
-                                                                                                        "若想终止以上广播，请发送\"取消\"。\n" +
-                                                                                                        "以上操作20秒内有效，超时未回复将自动终止发送。",
-                                                                                                        new List<string> { _msg.WXID },
-                                                                                                        _msg.Self,
-                                                                                                        _msg.Sender);
-                                                                            Loops(context, _msg, texts, images, files);
-                                                                        }
-                                                                        else
-                                                                        {
-                                                                            var path = context.WechatM.GetFilePath(_msg);
-                                                                            if (!System.IO.File.Exists(path))
-                                                                            {
-                                                                                context.WechatM.SendAtText($"附件接收失败，请重新发送。\n" +
-                                                                                                        "请发送\"确定\"立即发出以上广播内容。\n" +
-                                                                                                        AttackDesc(textLength, attachCount) +
-                                                                                                        "若想终止以上广播，请发送\"取消\"。\n" +
-                                                                                                        "以上操作20秒内有效，超时未回复将自动终止发送。",
-                                                                                                        new List<string> { _msg.WXID },
-                                                                                                        _msg.Self,
-                                                                                                        _msg.Sender);
-                                                                                Loops(context, _msg, texts, images, files);
-                                                                            }
-                                                                            else if (files.Contains(path))
-                                                                            {
-                                                                                context.WechatM.SendAtText($"你发送了重复的附件，请重新发送。\n" +
-                                                                                                        "请发送\"确定\"立即发出以上广播内容。\n" +
-                                                                                                        AttackDesc(textLength, attachCount) +
-                                                                                                        "若想终止以上广播，请发送\"取消\"。\n" +
-                                                                                                        "以上操作20秒内有效，超时未回复将自动终止发送。",
-                                                                                                        new List<string> { _msg.WXID },
-                                                                                                        _msg.Self,
-                                                                                                        _msg.Sender);
-                                                                                Loops(context, _msg, texts, images, files);
-                                                                            }
-                                                                            else
-                                                                            {
-                                                                                files.Add(path);
-                                                                                context.WechatM.SendAtText($"成功接收附件。\n" +
-                                                                                                        "请发送\"确定\"立即发出以上广播内容。\n" +
-                                                                                                        AttackDesc(textLength, attachCount) +
-                                                                                                        "若想终止以上广播，请发送\"取消\"。\n" +
-                                                                                                        "以上操作20秒内有效，超时未回复将自动终止发送。",
-                                                                                                        new List<string> { _msg.WXID },
-                                                                                                        _msg.Self,
-                                                                                                        _msg.Sender);
-                                                                                Loops(context, _msg, texts, images, files);
-                                                                            }
-                                                                        }
-
-                                                                    }
-                                                                    else if (_msg.Type == Tools.Common.Enums.WechatMessageType.Image)
-                                                                    {
-                                                                        var path = context.WechatM.GetImagePath(_msg);
-                                                                        if (!System.IO.File.Exists(path))
-                                                                        {
-                                                                            context.WechatM.SendAtText($"图片接收失败，请重新发送。\n" +
-                                                                                                    "请发送\"确定\"立即发出以上广播内容。\n" +
-                                                                                                    AttackDesc(textLength, attachCount) +
-                                                                                                    "若想终止以上广播，请发送\"取消\"。\n" +
-                                                                                                    "以上操作20秒内有效，超时未回复将自动终止发送。",
-                                                                                                    new List<string> { _msg.WXID },
-                                                                                                    _msg.Self,
-                                                                                                    _msg.Sender);
-                                                                            Loops(context, _msg, texts, images, files);
-                                                                        }
-                                                                        else if (images.Contains(path))
-                                                                        {
-                                                                            context.WechatM.SendAtText($"你发送了重复的图片，请重新发送。\n" +
-                                                                                                    "请发送\"确定\"立即发出以上广播内容。\n" +
-                                                                                                    AttackDesc(textLength, attachCount) +
-                                                                                                    "若想终止以上广播，请发送\"取消\"。\n" +
-                                                                                                    "以上操作20秒内有效，超时未回复将自动终止发送。",
-                                                                                                    new List<string> { _msg.WXID },
-                                                                                                    _msg.Self,
-                                                                                                    _msg.Sender);
-                                                                            Loops(context, _msg, texts, images, files);
-                                                                        }
-                                                                        else
-                                                                        {
-                                                                            images.Add(path);
-                                                                            context.WechatM.SendAtText($"成功接收图片。\n" +
-                                                                                                    "请发送\"确定\"立即发出以上广播内容。\n" +
-                                                                                                    AttackDesc(textLength, attachCount) +
-                                                                                                    "若想终止以上广播，请发送\"取消\"。\n" +
-                                                                                                    "以上操作20秒内有效，超时未回复将自动终止发送。",
-                                                                                                    new List<string> { _msg.WXID },
-                                                                                                    _msg.Self,
-                                                                                                    _msg.Sender);
-                                                                            Loops(context, _msg, texts, images, files);
-                                                                        }
-                                                                    }
-                                                                }
-                                                                catch (Exception ex)
-                                                                {
-                                                                    Context.Logger.Write(ex, _continueTag);
-                                                                    context.WechatM.SendAtText("因未知原因，操作失败了，具体原因见日志。",
-                                                                                             new List<string> { _msg.WXID },
-                                                                                             _msg.Self,
-                                                                                             _msg.Sender);
-                                                                }
-                                                            }),
-                                                            null,
-                                                            null,
-                                                            20,
-                                                            _continueTag);
+                _context.CommunicateM.RegistWaitMessageRequest(msg.Self, msg.Sender, msg.WXID,
+                                                                         onReceivedCallback: OnMessageArrival,
+                                                                         verifier: null,
+                                                                         onTimeout: new Action(() =>
+                                                                         {
+                                                                             RemoveBroadCast(msg);
+                                                                         }),
+                                                                         acceptTypes: null,
+                                                                         waitSeconds: 20,
+                                                                         tag: _continueTag);
             }
             catch (Exception ex)
             {
                 Context.Logger.Write(ex, Tag);
-                context.WechatM.SendAtText("因未知原因，操作失败了，具体原因见日志。",
+                _context.WechatM.SendAtText("因未知原因，操作失败了，具体原因见日志。",
                                             new List<string> { msg.WXID },
                                             msg.Self,
                                             msg.Sender);
             }
+        }
+        private void RemoveBroadCast(Message msg)
+        {
+            var _id = BroadCast.GetID(msg);
+            _broadCasts.TryRemove(_id, out _);
+        }
+        private async Task OnMessageArrival(Message msg)
+        {
+            try
+            {
+                var bcID = BroadCast.GetID(msg);
+                var bc = _broadCasts.ContainsKey(bcID) ? _broadCasts[bcID] : null;
+                if (bc is null) return;
+
+                if (msg.Type == Tools.Common.Enums.WechatMessageType.Text)
+                {
+                    if (msg.Content == "取消")
+                    {
+                        RemoveBroadCast(msg);
+                    }
+                    else if (msg.Content == "确定")
+                    {
+                        SendBroadCasts(msg, bc.Content, bc.Images, bc.Files);
+                        return;
+                    }
+                    else
+                    {
+                        var text = msg.Content.Trim();
+                        if (bc.ContentLength + text.Length >= 500)
+                        {
+                            _context.WechatM.SendAtText("因文本长度超长，内容增加失败。\n" +
+                                                        "请发送\"确定\"立即发出以上广播内容。\n" +
+                                                        AttackDesc(bc.ContentLength, bc.AttachCount) +
+                                                        "若想终止以上广播，请发送\"取消\"。\n" +
+                                                        "以上操作20秒内有效，超时未回复将自动终止发送。",
+                                                        new List<string> { msg.WXID },
+                                                        msg.Self,
+                                                        msg.Sender);
+                            Loops(msg);
+                        }
+                        else
+                        {
+                            bc.Content.Add(text);
+                            _context.WechatM.SendAtText("成功接收文本。\n" +
+                                                        "请发送\"确定\"立即发出以上广播内容。\n" +
+                                                        AttackDesc(bc.ContentLength, bc.AttachCount) +
+                                                        "若想终止以上广播，请发送\"取消\"。\n" +
+                                                        "以上操作20秒内有效，超时未回复将自动终止发送。",
+                                                        new List<string> { msg.WXID },
+                                                        msg.Self,
+                                                        msg.Sender);
+                            Loops(msg);
+                        }
+                    }
+                }
+                else if (msg.Type == Tools.Common.Enums.WechatMessageType.File)
+                {
+                    if (bc.AttachCount > _maxCount)
+                    {
+                        _context.WechatM.SendAtText($"附件数量已经达到{_maxCount}，无法继续添加。\n" +
+                                                   "请发送\"确定\"立即发出以上广播内容。\n" +
+                                                   AttackDesc(bc.ContentLength, bc.AttachCount) +
+                                                   "若想终止以上广播，请发送\"取消\"。\n" +
+                                                   "以上操作20秒内有效，超时未回复将自动终止发送。",
+                                                   new List<string> { msg.WXID },
+                                                   msg.Self,
+                                                   msg.Sender);
+                        Loops(msg);
+                    }
+                    else
+                    {
+                        var path = _context.WechatM.GetFilePath(msg);
+                        if (!System.IO.File.Exists(path))
+                        {
+                            _context.WechatM.SendAtText($"附件接收失败，请重新发送。\n" +
+                                                        "请发送\"确定\"立即发出以上广播内容。\n" +
+                                                        AttackDesc(bc.ContentLength, bc.AttachCount) +
+                                                        "若想终止以上广播，请发送\"取消\"。\n" +
+                                                        "以上操作20秒内有效，超时未回复将自动终止发送。",
+                                                        new List<string> { msg.WXID },
+                                                        msg.Self,
+                                                        msg.Sender); ;
+                            Loops(msg);
+                        }
+                        else if (bc.Files.Contains(path))
+                        {
+                            _context.WechatM.SendAtText($"你发送了重复的附件，请重新发送。\n" +
+                                                        "请发送\"确定\"立即发出以上广播内容。\n" +
+                                                        AttackDesc(bc.ContentLength, bc.AttachCount) +
+                                                        "若想终止以上广播，请发送\"取消\"。\n" +
+                                                        "以上操作20秒内有效，超时未回复将自动终止发送。",
+                                                        new List<string> { msg.WXID },
+                                                        msg.Self,
+                                                        msg.Sender);
+                            Loops(msg);
+                        }
+                        else
+                        {
+                            bc.Files.Add(path);
+                            _context.WechatM.SendAtText($"成功接收附件。\n" +
+                                                        "请发送\"确定\"立即发出以上广播内容。\n" +
+                                                        AttackDesc(bc.ContentLength, bc.AttachCount) +
+                                                        "若想终止以上广播，请发送\"取消\"。\n" +
+                                                        "以上操作20秒内有效，超时未回复将自动终止发送。",
+                                                        new List<string> { msg.WXID },
+                                                        msg.Self,
+                                                        msg.Sender);
+                            Loops(msg);
+                        }
+                    }
+
+                }
+                else if (msg.Type == Tools.Common.Enums.WechatMessageType.Image)
+                {
+                    var path = _context.WechatM.GetImagePath(msg);
+                    if (!System.IO.File.Exists(path))
+                    {
+                        _context.WechatM.SendAtText($"图片接收失败，请重新发送。\n" +
+                                                    "请发送\"确定\"立即发出以上广播内容。\n" +
+                                                    AttackDesc(bc.ContentLength, bc.AttachCount) +
+                                                    "若想终止以上广播，请发送\"取消\"。\n" +
+                                                    "以上操作20秒内有效，超时未回复将自动终止发送。",
+                                                    new List<string> { msg.WXID },
+                                                    msg.Self,
+                                                    msg.Sender);
+                        Loops(msg);
+                    }
+                    else if (bc.Images.Contains(path))
+                    {
+                        _context.WechatM.SendAtText($"你发送了重复的图片，请重新发送。\n" +
+                                              "请发送\"确定\"立即发出以上广播内容。\n" +
+                                              AttackDesc(bc.ContentLength, bc.AttachCount) +
+                                              "若想终止以上广播，请发送\"取消\"。\n" +
+                                              "以上操作20秒内有效，超时未回复将自动终止发送。",
+                                              new List<string> { msg.WXID },
+                                              msg.Self,
+                                              msg.Sender);
+                        Loops(msg);
+                    }
+                    else
+                    {
+                        bc.Images.Add(path);
+                        _context.WechatM.SendAtText($"成功接收图片。\n" +
+                                                      "请发送\"确定\"立即发出以上广播内容。\n" +
+                                                      AttackDesc(bc.ContentLength, bc.AttachCount) +
+                                                      "若想终止以上广播，请发送\"取消\"。\n" +
+                                                      "以上操作20秒内有效，超时未回复将自动终止发送。",
+                                                      new List<string> { msg.WXID },
+                                                      msg.Self,
+                                                      msg.Sender);
+                        Loops(msg);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Context.Logger.Write(ex, _continueTag);
+                _context.WechatM.SendAtText("因未知原因，操作失败了，具体原因见日志。",
+                                       new List<string> { msg.WXID },
+                msg.Self,
+                msg.Sender);
+            }
+
         }
         /// <summary>
         /// 立即发出广播
@@ -247,23 +275,23 @@ namespace RS.Snail.JJJ.robot.cmd.misc
         /// <param name="texts"></param>
         /// <param name="images"></param>
         /// <param name="files"></param>
-        private static void SendBroadCasts(Context context, Message msg, List<string> texts, List<string> images, List<string> files)
+        private void SendBroadCasts(Message msg, List<string> texts, List<string> images, List<string> files)
         {
             try
             {
                 var text = string.Join("\n", texts);
-                foreach (var robotWxid in context.WechatM.GetWechatRobotWXIDs())
+                foreach (var robotWxid in _context.WechatM.GetWechatRobotWXIDs())
                 {
-                    foreach (var chatroom in context.ContactsM.GetAllGroupWXID(robotWxid, false))
+                    foreach (var chatroom in _context.ContactsM.GetAllGroupWXID(robotWxid, false))
                     {
-                        context.WechatM.SendText(text, robotWxid, chatroom);
+                        _context.WechatM.SendText(text, robotWxid, chatroom);
                         foreach (var path in images)
                         {
-                            context.WechatM.SendImage(path, robotWxid, chatroom);
+                            _context.WechatM.SendImage(path, robotWxid, chatroom);
                         }
                         foreach (var path in files)
                         {
-                            context.WechatM.SendFile(path, robotWxid, chatroom);
+                            _context.WechatM.SendFile(path, robotWxid, chatroom);
                         }
                     }
                 }
@@ -272,7 +300,7 @@ namespace RS.Snail.JJJ.robot.cmd.misc
             catch (Exception ex)
             {
                 Context.Logger.Write(ex, Tag);
-                context.WechatM.SendAtText("因未知原因，操作失败了，具体原因见日志。",
+                _context.WechatM.SendAtText("因未知原因，操作失败了，具体原因见日志。",
                                             new List<string> { msg.WXID },
                                             msg.Self,
                                             msg.Sender);

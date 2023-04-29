@@ -141,12 +141,12 @@ namespace RS.Snail.JJJ.robot.modules
         #endregion
 
         #region MESSAGES RECEIVE
-        private void OnWechatMessageReceived(dynamic message)
+        private async Task OnWechatMessageReceived(dynamic message)
         {
-            _context.CommunicateM.ReceiveMessage(message);
+            await _context.CommunicateM.ReceiveMessage(message);
         }
 
-        private void OnWechatStatChanged(string wxid, bool stat)
+        private async Task OnWechatStatChanged(string wxid, bool stat)
         {
 
         }

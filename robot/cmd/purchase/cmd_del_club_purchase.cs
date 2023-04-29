@@ -1,6 +1,7 @@
 ﻿using RS.Snail.JJJ.boot;
 using RS.Snail.JJJ.clone;
 using RS.Snail.JJJ.robot.include;
+using RS.Tools.Common.Enums;
 using RS.Tools.Common.Utils;
 using System;
 using System.Collections.Generic;
@@ -10,17 +11,23 @@ using System.Threading.Tasks;
 
 namespace RS.Snail.JJJ.robot.cmd.purchase
 {
-    [attribute.CmdClass]
-    internal class cmd_del_club_purchase
-    {
-        public const string Instrus = "清空订阅";
-        public const string Tag = "cmd_del_club_purchase";
-        public const include.ChatScene EnableScene = include.ChatScene.All;
-        public const include.UserRole MinRole = include.UserRole.ADMINISTRATOR;
-        public const Tools.Common.Enums.WechatMessageType AcceptMessageType = Tools.Common.Enums.WechatMessageType.Text;
 
-        [attribute.Cmd(Name: Tag, instru: Instrus, enableScene: (int)EnableScene, minRole: (int)MinRole, acceptType: (int)AcceptMessageType)]
-        public static void Do(Context context, Message msg)
+    internal class cmd_del_club_purchase : ICMD
+    {
+        public Context _context { get; set; }
+        public cmd_del_club_purchase(Context context)
+        {
+            _context = context;
+        }
+        public List<string> Commands => new List<string> { "清空订阅", "重置订阅" };
+        public List<string> CommandsJP { get => Commands.Select(a => Pinyin.GetInitials(a).ToLower()).ToList(); }
+        public List<string> CommandsQP { get => Commands.Select(a => Pinyin.GetPinyin(a).ToLower()).ToList(); }
+        public string Tag => "cmd_del_club_purchase";
+        public ChatScene EnableScene => ChatScene.All;
+        public UserRole MinRole => UserRole.ADMINISTRATOR;
+        public WechatMessageType AcceptMessageType => WechatMessageType.Text;
+
+        async public Task Do(Message msg)
         {
             try
             {
@@ -42,10 +49,10 @@ namespace RS.Snail.JJJ.robot.cmd.purchase
                     if (msg.Scene == ChatScene.Private) return;
                     else
                     {
-                        var group = context.ContactsM.FindGroup(msg.Self, msg.Sender);
+                        var group = _context.ContactsM.FindGroup(msg.Self, msg.Sender);
                         if (group is null)
                         {
-                            context.WechatM.SendAtText($"⚠️唧唧叽缺少当前微信群的资料，请联系超管使用命令\"刷新群信息\"。",
+                            _context.WechatM.SendAtText($"⚠️唧唧叽缺少当前微信群的资料，请联系超管使用命令\"刷新群信息\"。",
                                                         new List<string> { msg.WXID },
                                                         msg.Self,
                                                         msg.Sender);
@@ -59,10 +66,10 @@ namespace RS.Snail.JJJ.robot.cmd.purchase
 
 
                 // 找到俱乐部
-                var club = context.ClubsM.FindClub(msg.Self, rid);
+                var club = _context.ClubsM.FindClub(msg.Self, rid);
                 if (club is null)
                 {
-                    context.WechatM.SendAtText($"⚠️要查询的俱乐部[{rid}]不存在。",
+                    _context.WechatM.SendAtText($"⚠️要查询的俱乐部[{rid}]不存在。",
                                                 new List<string> { msg.WXID },
                                                 msg.Self,
                                                 msg.Sender);
@@ -70,11 +77,11 @@ namespace RS.Snail.JJJ.robot.cmd.purchase
                 }
 
                 club.PurchaseEnd = TimeHelper.ToTimeStamp();
-                context.WechatM.SendAtText($"已清空俱乐部[{club.Name}]的唧唧叽订阅",
-                                        new List<string> { msg.WXID },
-                                        msg.Self,
-                                        msg.Sender);
-           
+                _context.WechatM.SendAtText($"已清空俱乐部[{club.Name}]的唧唧叽订阅",
+                                            new List<string> { msg.WXID },
+                                            msg.Self,
+                                            msg.Sender);
+
             }
             catch (Exception ex)
             {

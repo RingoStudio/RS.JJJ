@@ -1,5 +1,7 @@
 ﻿using RS.Snail.JJJ.boot;
 using RS.Snail.JJJ.clone;
+using RS.Snail.JJJ.robot.include;
+using RS.Tools.Common.Enums;
 using RS.Tools.Common.Utils;
 using System;
 using System.Collections.Generic;
@@ -9,16 +11,23 @@ using System.Threading.Tasks;
 
 namespace RS.Snail.JJJ.robot.cmd.misc
 {
-    [attribute.CmdClass]
-    internal class cmd_role
+    
+    internal class cmd_role : ICMD
     {
-        public const string Instrus = "roll,摇骰子,摇色字,随机数";
-        public const string Tag = "cmd_roll";
-        public const include.ChatScene EnableScene = include.ChatScene.All;
-        public const include.UserRole MinRole = include.UserRole.PLAYER;
-        public const RS.Tools.Common.Enums.WechatMessageType AcceptMessageType = Tools.Common.Enums.WechatMessageType.Text;
-        [attribute.Cmd(Name: Tag, instru: Instrus, enableScene: (int)EnableScene, minRole: (int)MinRole, acceptType: (int)AcceptMessageType)]
-        public static void Do(Context context, Message msg)
+        public Context _context { get; set; }
+        public cmd_role(Context context)
+        {
+            _context = context;
+        }
+        public List<string> Commands => new List<string> { "roll","摇骰子","摇色字","随机数" };
+        public List<string> CommandsJP { get => Commands.Select(a => Pinyin.GetInitials(a).ToLower()).ToList(); }
+        public List<string> CommandsQP { get => Commands.Select(a => Pinyin.GetPinyin(a).ToLower()).ToList(); }
+        public string Tag => "cmd_role";
+        public ChatScene EnableScene => ChatScene.All;
+        public UserRole MinRole => UserRole.GROUP_MANAGER;
+        public WechatMessageType AcceptMessageType => WechatMessageType.Text;
+
+        async public Task Do(Message msg)
         {
             try
             {
@@ -30,7 +39,7 @@ namespace RS.Snail.JJJ.robot.cmd.misc
                 max = list.Max();
                 min = list.Min();
                 var result = new Random().NextInt64(min, max + 1);
-                context.WechatM.SendAtText($"ROLL {min}~{max} 结果:\n  [{result}]",
+                _context.WechatM.SendAtText($"ROLL {min}~{max} 结果:\n  [{result}]",
                                            new List<string> { msg.WXID },
                                            msg.Self,
                                            msg.Sender);

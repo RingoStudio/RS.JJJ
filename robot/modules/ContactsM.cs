@@ -782,6 +782,8 @@ namespace RS.Snail.JJJ.robot.modules
                         if (r > UserRole.UNDEFINED) return r;
                     }
                 }
+
+                return UserRole.UNDEFINED;
             }
             // 未指定群，查询所有群内最高权限
             var role = UserRole.UNDEFINED;

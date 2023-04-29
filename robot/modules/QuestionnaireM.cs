@@ -116,9 +116,11 @@ namespace RS.Snail.JJJ.robot.modules
         /// 建立新的调查问卷
         /// </summary>
         /// <param name="question"></param>
-        public void SetQuestion(string question)
+        public void SetQuestion(string question, string response = "")
         {
             _questionnaires[question] = new JObject();
+            _questionnaires[question]["question"] = question;
+            _questionnaires[question]["response"] = question;
         }
         /// <summary>
         /// 删除问题
@@ -146,18 +148,19 @@ namespace RS.Snail.JJJ.robot.modules
                 try
                 {
                     if (_questionnaires[question] is null) return (false, "调查问题不存在");
-                    _questionnaires[question][wxid] = new JObject();
-                    _questionnaires[question][wxid]["robot"] = robotWxid;
-                    _questionnaires[question][wxid]["time"] = TimeHelper.ToTimeStamp();
-                    _questionnaires[question][wxid]["club_rid"] = club.RID;
-                    _questionnaires[question][wxid]["club_name"] = club.Name;
-                    _questionnaires[question][wxid]["club_channel"] = include.club.ChannelTypeDesc(club.ChannelType);
-                    _questionnaires[question][wxid]["club_dsit"] = club.DistDesc;
-                    _questionnaires[question][wxid]["group_wxid"] = group.WXID;
-                    _questionnaires[question][wxid]["group_name"] = group.Name;
-                    _questionnaires[question][wxid]["group_member_nick"] = group.Members.ContainsKey(wxid) ? group.Members[wxid].NickName : "";
-                    _questionnaires[question][wxid]["game_uid"] = uid;
-                    _questionnaires[question][wxid]["answer"] = answer;
+                    _questionnaires[question]["answer"] = _questionnaires[question]["answer"] ?? new JObject();
+                    _questionnaires[question]["answer"][wxid] = new JObject();
+                    _questionnaires[question]["answer"][wxid]["robot"] = robotWxid;
+                    _questionnaires[question]["answer"][wxid]["time"] = TimeHelper.ToTimeStamp();
+                    _questionnaires[question]["answer"][wxid]["club_rid"] = club.RID;
+                    _questionnaires[question]["answer"][wxid]["club_name"] = club.Name;
+                    _questionnaires[question]["answer"][wxid]["club_channel"] = include.club.ChannelTypeDesc(club.ChannelType);
+                    _questionnaires[question]["answer"][wxid]["club_dsit"] = club.DistDesc;
+                    _questionnaires[question]["answer"][wxid]["group_wxid"] = group.WXID;
+                    _questionnaires[question]["answer"][wxid]["group_name"] = group.Name;
+                    _questionnaires[question]["answer"][wxid]["group_member_nick"] = group.Members.ContainsKey(wxid) ? group.Members[wxid].NickName : "";
+                    _questionnaires[question]["answer"][wxid]["game_uid"] = uid;
+                    _questionnaires[question]["answer"][wxid]["answer"] = answer;
                     var clubMember = _context.ClubsM.FindMember(robotWxid, uid);
                     if (clubMember is not null) _questionnaires[question][wxid]["game_name"] = clubMember.NameOrUID();
                     return (true, null);
@@ -168,6 +171,13 @@ namespace RS.Snail.JJJ.robot.modules
                     return (false, "发生了未知错误");
                 }
             }
+        }
+
+        public string QueryResponse(string question)
+        {
+            var response = JSONHelper.ParseString(_questionnaires[question]?["response"]);
+            if (string.IsNullOrEmpty(response)) return "您的回复已被记录，谢谢支持！";
+            else return response;
         }
         /// <summary>
         /// 生成问卷调查excel
@@ -205,7 +215,10 @@ namespace RS.Snail.JJJ.robot.modules
                 foreach (var key in keys)
                 {
                     var data = _questionnaires[key];
-                    if (data is not null) continue;
+                    if (data is null) continue;
+
+                    data = data["answer"];
+                    if (data is null) continue;
 
                     foreach (var item in data)
                     {

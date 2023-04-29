@@ -1,5 +1,7 @@
 ﻿using RS.Snail.JJJ.boot;
 using RS.Snail.JJJ.clone;
+using RS.Snail.JJJ.robot.include;
+using RS.Tools.Common.Enums;
 using RS.Tools.Common.Utils;
 using System;
 using System.Collections.Generic;
@@ -9,21 +11,32 @@ using System.Threading.Tasks;
 
 namespace RS.Snail.JJJ.robot.cmd.misc
 {
-    [attribute.CmdClass]
-    internal class cmd_get_manual
+
+    internal class cmd_get_manual : ICMD
     {
-        public const string Instrus = "唧唧叽说明书,唧唧叽使用说明,唧唧叽用户手册";
-        public const string Tag = "cmd_get_manual";
-        public const include.ChatScene EnableScene = include.ChatScene.All;
-        public const include.UserRole MinRole = include.UserRole.GROUP_MANAGER;
-        public const RS.Tools.Common.Enums.WechatMessageType AcceptMessageType = Tools.Common.Enums.WechatMessageType.Text;
-        [attribute.Cmd(Name: Tag, instru: Instrus, enableScene: (int)EnableScene, minRole: (int)MinRole, acceptType: (int)AcceptMessageType)]
-        public static void Do(Context context, Message msg)
+        public Context _context { get; set; }
+        public cmd_get_manual(Context context)
+        {
+            _context = context;
+        }
+        public List<string> Commands => new List<string> { "唧唧叽说明书", "唧唧叽使用说明", "唧唧叽用户手册", "帮助", "help" };
+        public List<string> CommandsJP { get => Commands.Select(a => Pinyin.GetInitials(a).ToLower()).ToList(); }
+        public List<string> CommandsQP { get => Commands.Select(a => Pinyin.GetPinyin(a).ToLower()).ToList(); }
+        public string Tag => "cmd_get_manual";
+        public ChatScene EnableScene => ChatScene.All;
+        public UserRole MinRole => UserRole.GROUP_MANAGER;
+        public WechatMessageType AcceptMessageType => WechatMessageType.Text;
+
+        async public Task Do(Message msg)
         {
             try
             {
-                var path = AppDomain.CurrentDomain.BaseDirectory + @"BOT\唧唧叽用户手册.pdf";
-                context.WechatM.SendFile(path, msg.Self, msg.Sender);
+                _context.WechatM.SendArtical(imagefilePath: "BOT\\jjj_instruction_cover.png",
+                                             url: "https://docs.qq.com/doc/p/4d2394c38d6fe94ee050b44a5a5d65f89f7c4bc0",
+                                             title: "唧唧叽用户手册",
+                                             @abstract: "©RingoStudio | 冰法集团 荣誉出品",
+                                             msg.Self,
+                                             msg.Sender);
             }
             catch (Exception ex)
             {

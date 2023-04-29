@@ -1,6 +1,8 @@
 ﻿using RS.Snail.JJJ.boot;
 using RS.Snail.JJJ.clone;
+using RS.Snail.JJJ.robot.cmd.utils;
 using RS.Snail.JJJ.robot.include;
+using RS.Tools.Common.Enums;
 using RS.Tools.Common.Utils;
 using System;
 using System.Collections.Generic;
@@ -10,17 +12,23 @@ using System.Threading.Tasks;
 
 namespace RS.Snail.JJJ.robot.cmd.club
 {
-    [attribute.CmdClass]
-    internal class cmd_query_group_war_spe4_auction_overview
-    {
-        public const string Instrus = "查询仓鼠拍卖总览,查询仓鼠历史拍卖总览";
-        public const string Tag = "cmd_query_group_war_spe4_auction_overview";
-        public const include.ChatScene EnableScene = include.ChatScene.All;
-        public const include.UserRole MinRole = include.UserRole.GROUP_MANAGER;
-        public const Tools.Common.Enums.WechatMessageType AcceptMessageType = Tools.Common.Enums.WechatMessageType.Text;
 
-        [attribute.Cmd(Name: Tag, instru: Instrus, enableScene: (int)EnableScene, minRole: (int)MinRole, acceptType: (int)AcceptMessageType)]
-        public static void Do(Context context, Message msg)
+    internal class cmd_query_group_war_spe4_auction_overview : ICMD
+    {
+        public Context _context { get; set; }
+        public cmd_query_group_war_spe4_auction_overview(Context context)
+        {
+            _context = context;
+        }
+        public List<string> Commands => new List<string> { "查询仓鼠拍卖总览", "查询仓鼠历史拍卖总览" };
+        public List<string> CommandsJP { get => Commands.Select(a => Pinyin.GetInitials(a).ToLower()).ToList(); }
+        public List<string> CommandsQP { get => Commands.Select(a => Pinyin.GetPinyin(a).ToLower()).ToList(); }
+        public string Tag => "cmd_query_group_war_spe4_auction_overview";
+        public ChatScene EnableScene => ChatScene.All;
+        public UserRole MinRole => UserRole.GROUP_MANAGER;
+        public WechatMessageType AcceptMessageType => WechatMessageType.Text;
+
+        async public Task Do(Message msg)
         {
             try
             {
@@ -34,10 +42,10 @@ namespace RS.Snail.JJJ.robot.cmd.club
                     if (msg.Scene == ChatScene.Private) return;
                     else
                     {
-                        var group = context.ContactsM.FindGroup(msg.Self, msg.Sender);
+                        var group = _context.ContactsM.FindGroup(msg.Self, msg.Sender);
                         if (group is null)
                         {
-                            context.WechatM.SendAtText($"⚠️唧唧叽缺少当前微信群的资料，请联系超管使用命令\"刷新群信息\"。",
+                            _context.WechatM.SendAtText($"⚠️唧唧叽缺少当前微信群的资料，请联系超管使用命令\"刷新群信息\"。",
                                                         new List<string> { msg.WXID },
                                                         msg.Self,
                                                         msg.Sender);
@@ -49,22 +57,9 @@ namespace RS.Snail.JJJ.robot.cmd.club
 
                 if (string.IsNullOrEmpty(rid)) return;
 
-                var purchase = context.PurchaseM.CheckPurchase(rid, msg);
-                if (!purchase.result)
+                if (!_context.ContactsM.CheckGroupRole(msg.Self, rid, msg.WXID, msg.Scene == ChatScene.Group ? msg.Sender : ""))
                 {
-                    if (!string.IsNullOrEmpty(purchase.desc))
-                    {
-                        context.WechatM.SendAtText(purchase.desc,
-                                              new List<string> { msg.WXID },
-                                              msg.Self,
-                                              msg.Sender);
-                    }
-                    return;
-                }
-
-                if (!context.ContactsM.CheckGroupRole(msg.Self, rid, msg.WXID, msg.Scene == ChatScene.Group ? msg.Sender : ""))
-                {
-                    context.WechatM.SendAtText($"不可以查看其他俱乐部的信息。",
+                    _context.WechatM.SendAtText($"不可以查看其他俱乐部的信息。",
                                              new List<string> { msg.WXID },
                                              msg.Self,
                                              msg.Sender);
@@ -72,15 +67,17 @@ namespace RS.Snail.JJJ.robot.cmd.club
                 }
 
                 // 找到俱乐部
-                var club = context.ClubsM.FindClub(msg.Self, rid);
+                var club = _context.ClubsM.FindClub(msg.Self, rid);
                 if (club is null)
                 {
-                    context.WechatM.SendAtText($"⚠️要查询的俱乐部[{rid}]不存在。",
+                    _context.WechatM.SendAtText($"⚠️要查询的俱乐部[{rid}]不存在。",
                                                 new List<string> { msg.WXID },
                                                 msg.Self,
                                                 msg.Sender);
                     return;
                 }
+
+                if (!CommonValidate.CheckPurchase(_context, msg, rid)) return;
 
                 var isAdmin = false;
                 if (msg.Scene == ChatScene.Private)
@@ -88,12 +85,12 @@ namespace RS.Snail.JJJ.robot.cmd.club
                     isAdmin = new string[] { "wxid_ywg9tgdsxzsh12", "ringoo" }.Contains(msg.WXID);
                 }
 
-                var result = context.ClubsM.GetGroupWarSpe4AuctionExcel(msg.Self, rid, isAdmin);
-                if (string.IsNullOrEmpty(result) || !System.IO.File.Exists(result)) context.WechatM.SendAtText("⚠️未查询到任何信息。",
+                var result = await Task.Run(() => _context.ClubsM.GetGroupWarSpe4AuctionExcel(msg.Self, rid, isAdmin));
+                if (string.IsNullOrEmpty(result) || !System.IO.File.Exists(result)) _context.WechatM.SendAtText("⚠️未查询到任何信息。",
                                                                                                             new List<string> { msg.WXID },
                                                                                                             msg.Self,
                                                                                                             msg.Sender);
-                else context.WechatM.SendFile(result,
+                else _context.WechatM.SendFile(result,
                                               msg.Self,
                                               msg.Sender);
             }

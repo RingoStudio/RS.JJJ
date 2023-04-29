@@ -949,56 +949,56 @@ namespace RS.Snail.JJJ.robot.modules
         /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <returns></returns>
-        public string? QueryGroupWarBossCombatRecordExcel(string robotWxid, string rid)
+        public string QueryGroupWarBossCombatRecordExcel(string robotWxid, string rid)
         {
-            var club = FindClub(robotWxid, rid);
-            if (club is null) return null;
-            if (!club.IsWeekUpdated()) return null;
+                  var club = FindClub(robotWxid, rid);
+                  if (club is null) return null;
+                  if (!club.IsWeekUpdated()) return null;
 
-            var fileName = $"OUT\\{ExcelHelper.GetFileName($"BOSS伤害总览_{club.Name}_{rid}")}";
+                  var fileName = $"OUT\\{ExcelHelper.GetFileName($"BOSS伤害总览_{club.Name}_{rid}")}";
 
-            try
-            {
-                var content = new List<List<string>>();
-                var header = new List<string>
-                                {
-                                    "区域",
-                                    "UID",
-                                    "昵称",
-                                    "伤害值",
-                                };
+                  try
+                  {
+                      var content = new List<List<string>>();
+                      var header = new List<string>
+                                      {
+                                        "区域",
+                                        "UID",
+                                        "昵称",
+                                        "伤害值",
+                                      };
 
-                content.Add(header);
+                      content.Add(header);
 
-                var data = club.CombatRecord ?? new JObject();
-                // {<area>:{<uid>:{"damage":<damage>}, ...}, ...}
-                foreach (var areaItem in data)
-                {
-                    var area = areaItem.Name;
-                    var areaData = areaItem.Value;
-                    foreach (var memberItem in areaData)
-                    {
-                        var uid = memberItem.Name;
-                        var memberData = memberItem.Value;
-                        var damage = JSONHelper.ParseInt(memberData.damage);
+                      var data = club.CombatRecord ?? new JObject();
+                      // {<area>:{<uid>:{"damage":<damage>}, ...}, ...}
+                      foreach (var areaItem in data)
+                      {
+                          var area = areaItem.Name;
+                          var areaData = areaItem.Value;
+                          foreach (var memberItem in areaData)
+                          {
+                              var uid = memberItem.Name;
+                              var memberData = memberItem.Value;
+                              var damage = JSONHelper.ParseInt(memberData.damage);
 
-                        content.Add(new List<string>
-                        {
-                            area,
-                            uid,
-                            QueryMemberName(robotWxid, uid),
-                            damage.ToString(),
-                        });
-                    }
-                }
+                              content.Add(new List<string>
+                              {
+                                area,
+                                uid,
+                                QueryMemberName(robotWxid, uid),
+                                damage.ToString(),
+                              });
+                          }
+                      }
 
-                return ExcelHelper.SaveSingleWorksheet(content, fileName, "BOSS伤害总览");
-            }
-            catch (Exception ex)
-            {
-                Context.Logger.Write(ex, "ClubsM.QueryGroupWarBossCombatRecordExcel");
-                return "";
-            }
+                      return ExcelHelper.SaveSingleWorksheet(content, fileName, "BOSS伤害总览");
+                  }
+                  catch (Exception ex)
+                  {
+                      Context.Logger.Write(ex, "ClubsM.QueryGroupWarBossCombatRecordExcel");
+                      return "";
+                  }
         }
         /// <summary>
         /// 查询物种历史信息

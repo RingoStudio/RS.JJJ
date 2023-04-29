@@ -55,7 +55,7 @@ namespace RS.Snail.JJJ.test
         {
             Console.WriteLine(msg);
         }
-        private void OnMessageRecall(dynamic msg)
+        private async Task OnMessageRecall(dynamic msg)
         {
             Console.BackgroundColor = ConsoleColor.Red;
             Console.ForegroundColor = ConsoleColor.White;

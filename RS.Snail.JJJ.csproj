@@ -5,8 +5,8 @@
     <TargetFramework>net6.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <AssemblyVersion>1.0.0.23112</AssemblyVersion>
-    <FileVersion>1.0.0.23112</FileVersion>
+    <AssemblyVersion>1.0.0.23119</AssemblyVersion>
+    <FileVersion>1.0.0.23119</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -18,6 +18,10 @@
     <ProjectReference Include="..\Client\RS.Snail.JJJ.Client.csproj" />
     <ProjectReference Include="..\QCSDK\RS.Snail.QCSDK.csproj" />
     <ProjectReference Include="..\Wechat\RS.Snail.JJJ.Wechat.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="robot\cmd\handbook\" />
   </ItemGroup>
 
 </Project>

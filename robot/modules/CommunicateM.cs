@@ -2,6 +2,7 @@
 using RS.Snail.JJJ.boot;
 using RS.Snail.JJJ.Client.core.res.communicate;
 using RS.Snail.JJJ.clone;
+using RS.Snail.JJJ.robot.cmd;
 using RS.Tools.Common.Utils;
 using System;
 using System.Collections.Concurrent;
@@ -23,7 +24,7 @@ namespace RS.Snail.JJJ.robot.modules
 
         private RS.Snail.JJJ.Wechat.Service _service;
 
-        private Dictionary<string, CommandInfo> _cmds;
+        private Dictionary<string, ICMD> _cmds;
         private ConcurrentDictionary<string, List<WaitMessageRequest>> _waitRequests;
         private ConcurrentDictionary<string, ConcurrentQueue<Message>> _messageQueue;
         private ConcurrentDictionary<string, bool> _isTreating;
@@ -44,14 +45,42 @@ namespace RS.Snail.JJJ.robot.modules
             _isTreating = new();
         }
 
+        /// <summary>
+        /// 实例化所有实现ICMD接口的命令类型
+        /// </summary>
         private void LoadCMDs()
         {
-            _cmds = Context.Reflactor.MappingMethodsForCMD();
+            //_cmds = Context.Reflactor.MappingMethodsForCMD();
+            _cmds = new();
+            var types = AppDomain.CurrentDomain.GetAssemblies()
+                        .SelectMany(x => x.GetTypes().Where(t => t.GetInterfaces().Contains(typeof(ICMD))))
+                        .ToArray();
+            foreach (var type in types)
+            {
+                try
+                {
+                    ICMD? cmd = Activator.CreateInstance(type, this) as ICMD;
+                    if (cmd is null) continue;
+                    var name = cmd.Tag;
+
+                    if (_cmds.ContainsKey(name))
+                    {
+                        continue;
+                    }
+
+                    _cmds.TryAdd(name, cmd);
+                }
+                catch (Exception)
+                {
+
+                    throw;
+                }
+            }
         }
         #endregion
 
         #region METHODS
-        public void ReceiveMessage(dynamic data)
+        public async Task ReceiveMessage(dynamic data)
         {
             try
             {
@@ -59,7 +88,7 @@ namespace RS.Snail.JJJ.robot.modules
                 var robotWXID = message.Self;
                 if (!_messageQueue.ContainsKey(robotWXID)) _messageQueue.TryAdd(robotWXID, new ConcurrentQueue<Message>());
                 _messageQueue[robotWXID].Enqueue(message);
-                if (!GetTreatingStat(robotWXID)) Task.Run(() => TreatMessages(robotWXID));
+                if (!GetTreatingStat(robotWXID)) await TreatMessages(robotWXID);
             }
             catch (Exception ex)
             {
@@ -94,7 +123,7 @@ namespace RS.Snail.JJJ.robot.modules
         /// 处理消息队列
         /// </summary>
         /// <param name="robotWXID"></param>
-        private void TreatMessages(string robotWXID)
+        private async Task TreatMessages(string robotWXID)
         {
             SetTreatingStat(robotWXID, true);
             do
@@ -105,7 +134,7 @@ namespace RS.Snail.JJJ.robot.modules
                 if (message is null) break;
 
                 // 先检查等待响应
-                if (TreatWatingRequest(message)) continue;
+                if (await TreatWatingRequest(message)) continue;
 
                 // 检查ConfigM.SwitchCommunicateClose
                 if (_context.ConfigsM.SwitchCommunicateClose)
@@ -127,7 +156,7 @@ namespace RS.Snail.JJJ.robot.modules
         /// </summary>
         /// <param name="message"></param>
         /// <returns></returns>
-        private bool TreatWatingRequest(Message message)
+        private async Task<bool> TreatWatingRequest(Message message)
         {
             if (!_waitRequests.ContainsKey(message.Self) || _waitRequests[message.Self].Count <= 0) return false;
             var found = false;
@@ -137,6 +166,7 @@ namespace RS.Snail.JJJ.robot.modules
                 // 超时的命令不予处理
                 if (item.StartTime + item.WaitTime <= now)
                 {
+                    item.OnTimeOut?.Invoke();
                     item.IsFinished = true;
                     continue;
                 }
@@ -148,7 +178,7 @@ namespace RS.Snail.JJJ.robot.modules
                     (item.AcceptTypes is null || item.AcceptTypes.Contains(message.Type)) &&
                     (item.Verify is null || item.Verify.Invoke(message)))
                 {
-                    item.OnReceivedCallback(message);
+                    await item.OnReceivedCallback(message);
                     item.IsFinished = true;
                     found = true;
                 }
@@ -162,38 +192,31 @@ namespace RS.Snail.JJJ.robot.modules
         /// 处理文本消息
         /// </summary>
         /// <param name="message"></param>
-        private void TreatTextMessage(Message message)
+        private async Task TreatTextMessage(Message message)
         {
             // CD
             if (_context.CdM.IsInCD(message)) return;
 
             // 命令来自消息头部，以空格隔开
             var instru = message.Content.Split(" ").First().ToLower();
-            var found = false;
             foreach (var item in _cmds)
             {
-                if (item.Value.Instrus.Contains("/gc"))
-                {
-                    var a = 0;
-                }
-                if ((item.Value.AcceptType is null || item.Value.AcceptType == message.Type) &&
-                    CheckEnableScene(item.Value.EnableScene, message) &&
-                    ((item.Value.Instrus is not null && item.Value.Instrus.Contains(instru)) ||
-                    (item.Value.InstrusJianpin is not null && item.Value.InstrusJianpin.Contains(instru))) &&
-                    CheckRequestRole(item.Value.MinRole, message))
-                {
-                    Task.Run(() => Context.Reflactor.Invoke(item.Value, _context, message));
-                    found = true;
-                    break;
-                }
-            }
+                if (item.Value.AcceptMessageType != message.Type) continue;
+                if (!CheckEnableScene(item.Value.EnableScene, message)) continue;
+                if (!item.Value.Commands.Contains(instru) &&
+                   !item.Value.CommandsJP.Contains(instru) &&
+                   !item.Value.CommandsQP.Contains(instru)) continue;
+                if (!CheckRequestRole(item.Value.MinRole, message)) continue;
 
+                await item.Value.Do(message);
+                return;
+            }
             // 特殊指令
-            if (!found && message.Scene != include.ChatScene.Private)
+            if (message.Scene != include.ChatScene.Private)
             {
                 if (message.IsCallingJijiji)
                 {
-                    Task.Run(() => CommonConversation(message, message.IsCallingJijiji));
+                    await CommonConversation(message, message.IsCallingJijiji);
                 }
             }
         }
@@ -202,12 +225,12 @@ namespace RS.Snail.JJJ.robot.modules
         /// </summary>
         /// <param name="msg"></param>
         /// <returns></returns>
-        private bool CommonConversation(Message msg, bool isForce = false)
+        private async Task<bool> CommonConversation(Message msg, bool isForce = false)
         {
-            var response = "";
+            dynamic? response = null;
             if (msg.Scene == include.ChatScene.Private)
             {
-                response = _context.ConversationM.QueryConversation("", msg.WXID, msg.Content, isForce);
+                response = await _context.ConversationM.QueryConversation("", msg.WXID, msg.Content, isForce);
             }
             else
             {
@@ -215,14 +238,12 @@ namespace RS.Snail.JJJ.robot.modules
                 if (group is not null)
                 {
                     var rid = group.RID ?? "";
-                    response = _context.ConversationM.QueryConversation(rid, msg.WXID, msg.Content, isForce);
+                    response = await _context.ConversationM.QueryConversation(rid, msg.WXID, msg.Content, isForce);
                 }
             }
 
-            if (string.IsNullOrEmpty(response)) return false;
-            _context.WechatM.SendAtText(response, new List<string> { msg.WXID }, msg.Self, msg.Sender);
-
-            return true;
+            if (response is null) return false;
+            return _context.ConversationM.SendResponse(response, msg);
         }
 
         private bool CheckEnableScene(robot.include.ChatScene? request, Message message)
@@ -241,8 +262,9 @@ namespace RS.Snail.JJJ.robot.modules
         #region REGISTER
         public void RegistWaitMessageRequest(string robotWXID,
                                              string sender, string wxid,
-                                             Action<Message> onReceivedCallback,
-                                             Func<Message, bool>? verifier,
+                                             Func<Message, Task> onReceivedCallback,
+                                             Func<Message, bool>? verifier = null,
+                                             Action onTimeout = null,
                                              List<RS.Tools.Common.Enums.WechatMessageType>? acceptTypes = null,
                                              int waitSeconds = 10,
                                              string tag = "")
@@ -254,6 +276,7 @@ namespace RS.Snail.JJJ.robot.modules
                 Sender = sender,
                 WXID = wxid,
                 OnReceivedCallback = onReceivedCallback,
+                OnTimeOut = onTimeout,
                 AcceptTypes = acceptTypes,
                 Verify = verifier,
                 StartTime = TimeHelper.ToTimeStamp(),
@@ -267,6 +290,7 @@ namespace RS.Snail.JJJ.robot.modules
             {
                 _waitRequests[robotWXID] = _waitRequests[robotWXID].Where((a) =>
                 {
+                    a.OnTimeOut?.Invoke();
                     return !(a.Tag == tag && a.Sender == sender && a.WXID == wxid);
                 }).ToList();
             }
@@ -276,7 +300,8 @@ namespace RS.Snail.JJJ.robot.modules
             public string Tag { get; set; }
             public string Sender { get; set; }
             public string WXID { get; set; }
-            public Action<Message> OnReceivedCallback { get; set; }
+            public Func<Message, Task>? OnReceivedCallback { get; set; }
+            public Action? OnTimeOut { get; set; }
             public List<RS.Tools.Common.Enums.WechatMessageType>? AcceptTypes { get; set; }
             public Func<Message, bool>? Verify { get; set; }
             public long StartTime { get; set; }

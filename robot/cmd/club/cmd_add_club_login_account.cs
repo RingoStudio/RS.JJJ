@@ -1,5 +1,6 @@
 ﻿using RS.Snail.JJJ.boot;
 using RS.Snail.JJJ.clone;
+using RS.Snail.JJJ.robot.cmd.utils;
 using RS.Snail.JJJ.robot.include;
 using RS.Tools.Common.Enums;
 using RS.Tools.Common.Utils;
@@ -11,17 +12,22 @@ using System.Threading.Tasks;
 
 namespace RS.Snail.JJJ.robot.cmd.club
 {
-    [attribute.CmdClass]
-    internal class cmd_add_club_login_account
+    internal class cmd_add_club_login_account : ICMD
     {
-        public const string Instrus = "增加俱乐部登录账号,更新俱乐部登录账号";
-        public const string Tag = "cmd_add_club_login_account";
-        public const include.ChatScene EnableScene = include.ChatScene.All;
-        public const include.UserRole MinRole = include.UserRole.GROUP_MANAGER;
-        public const Tools.Common.Enums.WechatMessageType AcceptMessageType = Tools.Common.Enums.WechatMessageType.Text;
+        public Context _context { get; set; }
+        public cmd_add_club_login_account(Context context)
+        {
+            _context = context;
+        }
+        public List<string> Commands { get; } = new List<string> { "增加俱乐部登录账号", "更新俱乐部登录账号" };
+        public List<string> CommandsJP { get => Commands.Select(a => Pinyin.GetInitials(a).ToLower()).ToList(); }
+        public List<string> CommandsQP { get => Commands.Select(a => Pinyin.GetPinyin(a).ToLower()).ToList(); }
+        public string Tag { get; } = "cmd_add_club_login_account";
+        public ChatScene EnableScene { get; } = include.ChatScene.All;
+        public UserRole MinRole { get; } = include.UserRole.GROUP_MANAGER;
+        public WechatMessageType AcceptMessageType { get; } = Tools.Common.Enums.WechatMessageType.Text;
 
-        [attribute.Cmd(Name: Tag, instru: Instrus, enableScene: (int)EnableScene, minRole: (int)MinRole, acceptType: (int)AcceptMessageType)]
-        public static void Do(Context context, Message msg)
+        async public Task Do(Message msg)
         {
             try
             {
@@ -34,59 +40,45 @@ namespace RS.Snail.JJJ.robot.cmd.club
                 var account = arr[2];
                 var password = arr[3];
 
-                if (!context.ContactsM.CheckGroupRole(msg.Self, rid, msg.WXID, msg.Scene == ChatScene.Group ? msg.Sender : ""))
+                // 检查专有权限
+                if (!_context.ContactsM.CheckGroupRole(msg.Self, rid, msg.WXID, msg.Scene == ChatScene.Group ? msg.Sender : ""))
                 {
-                    context.WechatM.SendAtText($"不可以设置其他俱乐部的登陆账号密码。",
+                    _context.WechatM.SendAtText($"不可以设置其他俱乐部的登陆账号密码。",
                                              new List<string> { msg.WXID },
                                              msg.Self,
                                              msg.Sender);
                     return;
                 }
-              
 
-                var club = context.ClubsM.FindClub(msg.Self, rid);
+                // 检查俱乐部是否存在
+                var club = _context.ClubsM.FindClub(msg.Self, rid);
                 if (club is null)
                 {
-                    context.WechatM.SendAtText("没有找到这个俱乐部。",
+                    _context.WechatM.SendAtText($"未找到俱乐部[{rid}]。",
                                                 new List<string> { msg.WXID },
                                                 msg.Self,
                                                 msg.Sender);
                     return;
                 }
 
-                var purchase = context.PurchaseM.CheckPurchase(rid, msg);
-                if (!purchase.result)
-                {
-                    if (!string.IsNullOrEmpty(purchase.desc))
-                    {
-                        context.WechatM.SendAtText(purchase.desc,
-                                              new List<string> { msg.WXID },
-                                              msg.Self,
-                                              msg.Sender);
-                    }
-                    return;
-                }
+                // 检查订阅
+                if (!CommonValidate.CheckPurchase(_context, msg, rid)) return;
 
-                var result = context.ClubsM.AddClubLoginAccount(msg.Self, rid, account, password);
-                if (!result)
-                {
-                    context.WechatM.SendAtText("⚠️因未知原因，操作失败了。",
-                                                new List<string> { msg.WXID },
-                                                msg.Self,
-                                                msg.Sender);
-                }
-                else
-                {
-                    context.WechatM.SendAtText($"⚠️已成功更新俱乐部 [{club.Name} {rid}]的账号密码。",
+                // 执行
+                var result = _context.ClubsM.AddClubLoginAccount(msg.Self, rid, account, password);
+                if (!result) _context.WechatM.SendAtText("⚠️因未知原因，操作失败了。",
+                                                        new List<string> { msg.WXID },
+                                                        msg.Self,
+                                                        msg.Sender);
+                else _context.WechatM.SendAtText($"⚠️已成功更新俱乐部 [{club.Name} {rid}]的账号密码。",
                                                new List<string> { msg.WXID },
                                                msg.Self,
                                                msg.Sender);
-                }
             }
             catch (Exception ex)
             {
                 Context.Logger.Write(ex, Tag);
-                context.WechatM.SendAtText("⚠️因未知原因，操作失败了。",
+                _context.WechatM.SendAtText("⚠️因未知原因，操作失败了。",
                                                 new List<string> { msg.WXID },
                                                 msg.Self,
                                                 msg.Sender);

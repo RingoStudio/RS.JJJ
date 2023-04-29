@@ -21,6 +21,19 @@ namespace RS.Snail.JJJ.utils
 
         private static object _lock = new object();
 
+
+        public static async Task<string> GetResponse(string key)
+        {
+            try
+            {
+                return await Tools.Network.Client.HTTPGet.GetAsync(URL(key));
+            }
+            catch (Exception ex)
+            {
+                Logger.Instance.Write(ex, "Qingyunke");
+                return "";
+            }
+        }
         /// <summary>
         /// 从青云客获得回应
         /// </summary>
@@ -30,7 +43,7 @@ namespace RS.Snail.JJJ.utils
         /// <param name="sender"></param>
         /// <param name="wxid"></param>
         /// <param name="force"></param>
-        public static string? GetResponse(Context context, string key, string wxid, bool force = false)
+        public async static Task<string?> GetResponseAsync(Context context, string key, string wxid, bool force = false)
         {
 
             try
@@ -45,10 +58,7 @@ namespace RS.Snail.JJJ.utils
                 }
 
                 string data;
-                lock (_lock)
-                {
-                    data = Encoding.UTF8.GetString(Tools.Network.Client.HTTPGet.Get(url: URL(key)));
-                }
+                data = await Tools.Network.Client.HTTPGet.GetAsync(URL(key));
                 if (string.IsNullOrEmpty(data)) return null;
                 data = JSONHelper.ParseString(JObject.Parse(data)["content"]);
                 if (string.IsNullOrEmpty(data)) return null;
@@ -62,7 +72,7 @@ namespace RS.Snail.JJJ.utils
         }
 
 
-      
+
 
 
         private static string FixConversationContent(string raw)

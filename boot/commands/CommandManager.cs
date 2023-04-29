@@ -16,9 +16,9 @@ namespace RS.Snail.JJJ.boot
         #region PRIVATE FIELDS
         private readonly Dictionary<Type, dynamic> _instanceDict = new();
         #endregion
-        public dynamic Invoke(CommandInfo commandInfo, params object[]? param)
+        async public Task<dynamic> Invoke(CommandInfo commandInfo, params object[]? param)
         {
-            return commandInfo.MethodInfo.Invoke(commandInfo.InstanceType is null ? null : _instanceDict[commandInfo.InstanceType], param);
+            return await commandInfo.MethodInfo.Invoke(commandInfo.InstanceType is null ? null : _instanceDict[commandInfo.InstanceType], param);
 
         }
         public void InvokeAction(CommandInfo commandInfo, params object[]? param)

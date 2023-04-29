@@ -112,6 +112,18 @@ namespace RS.Snail.JJJ.clone
         /// 不提醒俱乐部成员变动
         /// </summary>
         public bool DontRemindClubMemberChanged { get; set; }
+        /// <summary>
+        /// 北极贝周不需要买白蝌蚪卷轴
+        /// </summary>
+        public bool Spe3DontNeedBuyGem { get; set; }
+        /// <summary>
+        /// 不需要提醒挖矿即将到期
+        /// </summary>
+        public bool DontRemindMineClose { get; set; }
+        /// <summary>
+        /// 布阵图显示战力数值
+        /// </summary>
+        public bool KitImageShowValue { get; set; }
         #endregion
 
         #region DATA
@@ -175,6 +187,8 @@ namespace RS.Snail.JJJ.clone
             RobotWXID = robotWxid;
             Members = new List<string>();
             GroupWarData = new Dbase(_context, new JObject());
+            PurchaseStart = TimeHelper.ToTimeStamp();
+            PurchaseEnd = PurchaseStart;
         }
 
         public Club(Context context, dynamic data)
@@ -197,6 +211,9 @@ namespace RS.Snail.JJJ.clone
             ClubKitPlanType = (ClubKitPlanType)JSONHelper.ParseInt(data.club_kit_plan_type);
             LoginDontAtHolder = JSONHelper.ParseBool(data.login_dont_at_holder);
             LoginAuto = JSONHelper.ParseBool(data.login_auto);
+            Spe3DontNeedBuyGem = JSONHelper.ParseBool(data.spe3_dont_need_buy_gem);
+            DontRemindMineClose = JSONHelper.ParseBool(data.dont_remind_mine_close);
+            KitImageShowValue = JSONHelper.ParseBool(data.kit_image_show_value);
 
             GroupWarSpe4AuctionPoses = JSONHelper.ParseStringList(data.group_war_spe_4_auction_poses);
             GroupWarSpe4AuctionPosesUpdateTime = JSONHelper.ParseLong(data.group_war_spe_4_auction_poses_update_time);
@@ -374,6 +391,9 @@ namespace RS.Snail.JJJ.clone
                 login_dont_at_holder = LoginDontAtHolder,
                 group_war_data = GroupWarData.dbase ?? new JObject(),
                 login_auto = LoginAuto,
+                spe3_dont_need_buy_gem = Spe3DontNeedBuyGem,
+                dont_remind_mine_close = DontRemindMineClose,
+                kit_image_show_value = KitImageShowValue,
 
                 group_war_spe_4_auction_poses = GroupWarSpe4AuctionPoses,
                 group_war_spe_4_auction_poses_update_time = GroupWarSpe4AuctionPosesUpdateTime,

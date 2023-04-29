@@ -11,25 +11,6 @@ using System.Text.RegularExpressions;
 using System.Xml;
 
 namespace RS.Snail.JJJ;
-//Console.WriteLine("Hello, World!");
-//var context = new RS.Snail.QCSDK.models.Context()
-//{
-//    Account = "12345678900",
-//    Password = "password",
-//    ChannelType = RS.Tools.Common.Enums.ChannelType.ANDROID,
-//};
-
-//dynamic jo = JObject.FromObject(new
-//{
-//    message = @"WEtWq4qiYg3M2ru/z58PR2GIrf2sy3qRYMbwmGjj9C6WJNUZwMQ214n7LJvFyn6PDX8Qd/SO65JXLZEDDf5w3SqH5xcT08/xbHISnOqQAw/PKN4MnaIUAtWxaBfQmIF7m25DqebV876K5kj0bWuZ3/7Q",
-//    timestamp = "1677921228",
-//});
-
-//var result = RS.Snail.QCSDK.SDK.DecodeAES(context, jo.ToString());
-//// var result = RS.Snail.QCSDK.tasks.Init.Do(context);
-
-//Console.WriteLine(result);
-// AutoScripts.FixConditions("J:\\Projects\\RS\\Snail\\JJJ\\Client\\core\\gane\\module\\condition");
 public class Entry
 {
     // Main函数异步启动并且接收命令数组
@@ -46,37 +27,45 @@ public class Entry
         //        if (item == "test") isTest = true;
         //    }
         //}
-        ////var tester = new test.WechatTest();
-        ////tester.Test(isRestart);
+
         //_context = new Context(isRestart, isTest);
+        //await Input();
 
-        //var input_promise = Input();
-        //await input_promise;
 
-        var test = new WechatTest();
-        test.Test(false);
+        do
+        {
+
+            var input = Console.ReadLine() ?? "";
+            if (string.IsNullOrEmpty(input)) continue;
+            var output = await utils.QingyunkeHelper.GetResponse(input);
+            output = JSONHelper.ParseString(JObject.Parse(output)["content"]);
+            Console.BackgroundColor = ConsoleColor.Blue;
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.Write("青云客: ");
+            Console.ResetColor();
+            Console.WriteLine(output);
+        } while (true);
     }
 
     // 等待并接收指令
-    async private static ValueTask Input()
+    async private static Task Input()
     {
-        await Task.Run(async () =>
+        await Task.Run(() =>
         {
             do
             {
                 // Your code could perform some useful task in the following loop. However, 
                 // for the sake of this example we'll merely pause for a quarter second.
 
-                while (Console.KeyAvailable == false)
-                    Task.Delay(250).Wait(); // Loop until input is entered.
+                while (Console.KeyAvailable == false) Task.Delay(250).Wait(); // Loop until input is entered.
                 var str = Console.ReadLine();
                 if (string.IsNullOrEmpty(str)) continue;
-                await AcceptCommand(str);
+                AcceptCommand(str);
             } while (true);
         });
     }
 
-    async private static ValueTask AcceptCommand(string command)
+    private static void AcceptCommand(string command)
     {
         switch (command.ToLower())
         {
