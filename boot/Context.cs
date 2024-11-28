@@ -228,7 +228,7 @@ namespace RS.Snail.JJJ.boot
                 }
 
                 var commaond = new List<string>();
-                var wxid = "ringoo";
+                var wxid = "？？？";
                 var atJJJ = false;
                 var isGroup = false;
                 var roomId = "";
@@ -237,10 +237,10 @@ namespace RS.Snail.JJJ.boot
                     if (item == "jjj") atJJJ = true;
                     else if (item == "g")
                     {
-                        roomId = "21167191107@chatroom";
+                        roomId = "？？？@chatroom";
                         isGroup = true;
                     }
-                    else if (item == "p") wxid = "ringoo";
+                    else if (item == "p") wxid = "？？？";
                     else commaond.Add(item);
                 }
                 RecvMsg msg = new(isSelf: false,

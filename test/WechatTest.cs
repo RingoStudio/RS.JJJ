@@ -14,11 +14,11 @@ namespace RS.Snail.JJJ.test
         public void Test(bool isRestart)
         {
             //        var wechat = new RS.Snail.JJJ.Wechat.Service(isRestart);
-            //        bool v = wechat.Init(new List<string> { "ringoo" },
+            //        bool v = wechat.Init(new List<string> { "？？？" },
             //                            msgCallback: msg => Console.Write(msg), 
             //                            recallCallback: OnMessageRecall);
             //        wechat.StartReceive();
-            //        // wechat.MsgStartImageHook("ringoo", "J:\\Projects\\RS\\Snail\\JJJ\\RS.JJJ\\bin\\Debug\\net6.0\\ReceivedImg");
+            //        // wechat.MsgStartImageHook("？？？", "J:\\Projects\\RS\\Snail\\JJJ\\RS.JJJ\\bin\\Debug\\net6.0\\ReceivedImg");
 
             //        do
             //        {
@@ -28,17 +28,17 @@ namespace RS.Snail.JJJ.test
             //                if (code == "self")
             //                {
 
-            //                    var data = wechat.GetSelfInfo("ringoo") ?? new JObject();
+            //                    var data = wechat.GetSelfInfo("？？？") ?? new JObject();
             //                    Console.WriteLine(data);
             //                }
             //                else if (code == "contact")
             //                {
-            //                    var data = wechat.ContactGetList("ringoo");
+            //                    var data = wechat.ContactGetList("？？？");
             //                    Console.WriteLine(data);
             //                }
             //                else if (code == "groupnick")
             //                {
-            //                    var dic = wechat.ContaceChatGroupMemberNames("ringoo");
+            //                    var dic = wechat.ContaceChatGroupMemberNames("？？？");
             //                    Console.WriteLine(dic);
             //                }
             //            }

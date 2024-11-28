@@ -73,7 +73,7 @@ namespace RS.Snail.JJJ.robot.cmd.club
                 var isAdmin = false;
                 if (msg.Scene == ChatScene.Private)
                 {
-                    isAdmin = new string[] { "wxid_ywg9tgdsxzsh12", "ringoo" }.Contains(msg.Sender);
+                    isAdmin = new string[] { "wxid_ywg9tgdsxzsh12", "？？？" }.Contains(msg.Sender);
                 }
 
                 var result = _context.ClubsM.GetGroupWarSpe4AuctionExcel(rid, isAdmin);
