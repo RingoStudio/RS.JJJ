@@ -5,6 +5,7 @@ obj/
 clone/Club.cs
 robot/modules/ClubsM.cs
 utils/AIConversationHelper.cs
+utils/OSSHelper.cs
 
 *.docx
 *.doc
