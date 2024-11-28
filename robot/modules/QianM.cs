@@ -23,7 +23,7 @@ namespace RS.Snail.JJJ.robot.modules
         private static int QIAN_STAT_DEFAULT = 0;
         private static int QIAN_STAT_WAITING = 1;
 
-        Context IModule._context => throw new NotImplementedException();
+        Context IModule._context => _context;
 
         private ConcurrentDictionary<string, (string shi, string jie)> _qians;
         private ConcurrentDictionary<string, (int stat, string qianKey, long time)> _qianCache;
@@ -83,9 +83,12 @@ namespace RS.Snail.JJJ.robot.modules
             var jo = IOHelper.GetCSV(Tools.Common.Enums.CSVType.RobotData, "qian_cache") ?? new JObject();
             foreach (var item in jo)
             {
-                var wxid = item.Key;
+                var wxid = item.Name;
                 var data = item.Value;
-                _qianCache[wxid] = (JSONHelper.ParseInt(data.stat), JSONHelper.ParseString(data.key), JSONHelper.ParseLong(data.time));
+                int stat = JSONHelper.ParseInt(data.stat);
+                string key = JSONHelper.ParseString(data.key);
+                long time = JSONHelper.ParseLong(data.time);
+                _qianCache[wxid] = (stat, key, time);
             }
             #endregion
 
@@ -113,7 +116,7 @@ namespace RS.Snail.JJJ.robot.modules
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, "CdM.SaveCSV");
+                Context.Logger.WriteException(ex, "CdM.SaveCSV");
             }
         }
         #endregion
@@ -136,11 +139,17 @@ namespace RS.Snail.JJJ.robot.modules
 
         public string QiuQian(string wxid)
         {
+
             var stat = GetQianStat(wxid);
-            if (stat.stat == QIAN_STAT_WAITING) return "你刚刚已经抽过签了\n" +
-                                                       "赶紧回复\"唧唧叽解签\"看看结果吧~";
-            if (IsQianCD(wxid)) return "求签冷却中...\n" +
-                                       "每天只能抽签一次哦~";
+            if (stat.stat == QIAN_STAT_WAITING)
+            {
+                if (string.IsNullOrEmpty(stat.key)) return "求签冷却中...\n每天只能抽签一次哦~";
+                else return "你刚刚已经抽过签了\n赶紧回复\"唧唧叽解签\"看看结果吧~";
+            }
+
+            //if (IsQianCD(wxid)) return "求签冷却中...\n" +
+            //                    "每天只能抽签一次哦~";
+
             var rnd = new Random(DateTime.Now.Millisecond);
             string key = "";
             do
@@ -196,6 +205,7 @@ namespace RS.Snail.JJJ.robot.modules
         /// <returns></returns>
         private bool CheckGuaCD(string wxid)
         {
+            if (_context.ContactsM.IsAdmin(wxid)) return false;
             var key = GetGuaCDKey(wxid);
             var time = _context.CdM.GetCache(key);
             var now = TimeHelper.ToTimeStamp();
@@ -227,8 +237,15 @@ namespace RS.Snail.JJJ.robot.modules
 
         private (int stat, string key) GetQianStat(string wxid)
         {
-            if (!_qianCache.ContainsKey(wxid)) return (QIAN_STAT_DEFAULT, "");
-            else return (QIAN_STAT_WAITING, _qianCache[wxid].qianKey);
+            if (IsQianCD(wxid))
+            {
+                // CD中
+                return (QIAN_STAT_WAITING, _qianCache.ContainsKey(wxid) ? _qianCache[wxid].qianKey : "");
+            }
+            else
+            {
+                return (QIAN_STAT_DEFAULT, "");
+            }
         }
 
         private string GetGuaCDKey(string wxid) => $"gua_cd_{wxid}";

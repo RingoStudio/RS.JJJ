@@ -27,7 +27,7 @@ namespace RS.Snail.JJJ.robot.cmd.purchase
         public UserRole MinRole => UserRole.ADMINISTRATOR;
         public WechatMessageType AcceptMessageType => WechatMessageType.Text;
 
-        async public Task Do(Message msg)
+        public void Do(Message msg)
         {
             try
             {
@@ -37,7 +37,7 @@ namespace RS.Snail.JJJ.robot.cmd.purchase
                 var add = 0;
                 if (arr.Length > 1)
                 {
-                    for (int i = 1; i <= arr.Length; i++)
+                    for (int i = 1; i < arr.Length; i++)
                     {
                         if (StringHelper.IsRID(arr[i])) rid = arr[i];
                     }
@@ -49,13 +49,10 @@ namespace RS.Snail.JJJ.robot.cmd.purchase
                     if (msg.Scene == ChatScene.Private) return;
                     else
                     {
-                        var group = _context.ContactsM.FindGroup(msg.Self, msg.Sender);
+                        var group = _context.ContactsM.FindGroup(msg.RoomID);
                         if (group is null)
                         {
-                            _context.WechatM.SendAtText($"⚠️唧唧叽缺少当前微信群的资料，请联系超管使用命令\"刷新群信息\"。",
-                                                        new List<string> { msg.WXID },
-                                                        msg.Self,
-                                                        msg.Sender);
+                            _context.WechatM.SendAtText($"⚠️唧唧叽缺少当前微信群的资料，请联系超管使用命令\"刷新群信息\"。", new List<string> { msg.Sender }, msg.RoomID);
                             return;
                         }
                         rid = group.RID;
@@ -66,26 +63,20 @@ namespace RS.Snail.JJJ.robot.cmd.purchase
 
 
                 // 找到俱乐部
-                var club = _context.ClubsM.FindClub(msg.Self, rid);
+                var club = _context.ClubsM.FindClub(rid);
                 if (club is null)
                 {
-                    _context.WechatM.SendAtText($"⚠️要查询的俱乐部[{rid}]不存在。",
-                                                new List<string> { msg.WXID },
-                                                msg.Self,
-                                                msg.Sender);
+                    _context.WechatM.SendAtText($"⚠️要查询的俱乐部[{rid}]不存在。", new List<string> { msg.Sender }, msg.RoomID);
                     return;
                 }
 
                 club.PurchaseEnd = TimeHelper.ToTimeStamp();
-                _context.WechatM.SendAtText($"已清空俱乐部[{club.Name}]的唧唧叽订阅",
-                                            new List<string> { msg.WXID },
-                                            msg.Self,
-                                            msg.Sender);
+                _context.WechatM.SendAtText($"已清空俱乐部[{club.Name}]的唧唧叽订阅", new List<string> { msg.Sender }, msg.RoomID);
 
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, Tag);
+                Context.Logger.WriteException(ex, Tag);
             }
         }
     }

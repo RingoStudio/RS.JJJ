@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using RS.WechatFerry.model;
 
 namespace RS.Snail.JJJ.clone
 {
@@ -19,7 +20,10 @@ namespace RS.Snail.JJJ.clone
         public string Alias { get; set; }
         public string NickName { get; set; }
         public string Remark { get; set; }
-        public string BigHeadImgUrl { get; set; }
+        public string Country { get; set; }
+        public string Province { get; set; }
+        public string City { get; set; }
+        public int Gender { get; set; }
         /// <summary>
         /// 作为会长的俱乐部RID
         /// </summary>
@@ -57,6 +61,13 @@ namespace RS.Snail.JJJ.clone
             this.NickName = nick;
         }
 
+        public User(UserInfo userInfo)
+        {
+            UpdateTime = TimeHelper.ToTimeStamp();
+            this.WXID = userInfo.Wxid;
+            this.NickName = userInfo.Name;
+        }
+
         /// <summary>
         /// 刷新时新建对象
         /// </summary>
@@ -83,7 +94,6 @@ namespace RS.Snail.JJJ.clone
             Alias = JSONHelper.ParseString(src["alias"]);
             NickName = CryptoHelper.DecryptBase64(JSONHelper.ParseString(src["nick_name"]));
             Remark = CryptoHelper.DecryptBase64(JSONHelper.ParseString(src["remark"]));
-            BigHeadImgUrl = JSONHelper.ParseString(src["big_head_img_url"]);
 
             //last_qian_time = JSONHelper.ParseJTokenToLng(src, "last_qian_time");
             //_qian_today = JSONHelper.ParseJTokenToInt(src, "qian_today");
@@ -91,6 +101,11 @@ namespace RS.Snail.JJJ.clone
             HoldsRIDs = JSONHelper.ParseStringList(src["rids"]);
             Role = (UserRole)JSONHelper.ParseInt(src["role"]);
             IsFriend = JSONHelper.ParseBool(src["is_friend"]);
+
+            Country = JSONHelper.ParseString(src.country);
+            Province = JSONHelper.ParseString(src.province);
+            City = JSONHelper.ParseString(src.city);
+            Gender = JSONHelper.ParseInt(src.gender);
         }
         public void RefreshInfo(dynamic src)
         {
@@ -111,10 +126,13 @@ namespace RS.Snail.JJJ.clone
                 alias = Alias,
                 nick_name = CryptoHelper.EncryptBase64(NickName),
                 remark = CryptoHelper.EncryptBase64(Remark),
-                big_head_img_url = BigHeadImgUrl,
                 rids = HoldsRIDs,
                 role = (int)Role,
                 is_friend = IsFriend,
+                country = Country,
+                province = Province,
+                city = City,
+                gender = Gender,
             });
         }
         #endregion

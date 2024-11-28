@@ -53,7 +53,11 @@ namespace RS.Snail.JJJ.robot.include
         /// <summary>
         /// cdkey缓存列表
         /// </summary>
-        public const string CDKey = "cdkey";
+        public const string CDKey = "cdkey2";
+        /// <summary>
+        /// 访客资料
+        /// </summary>
+        public const string Visitor = "visitor";
         /// <summary>
         /// 自动登录缓存列表
         /// </summary>
@@ -66,5 +70,16 @@ namespace RS.Snail.JJJ.robot.include
 
         public const string Common_Configs = "jjj_cfg";
         public const string Role_Cache = "role_cache";
+
+        #region FILE NAMES
+        public const string File_ClubStatements = "俱乐部名单";
+        public const string File_GroupWarStatements = "物种总览";
+        public const string File_BossDamageStatements = "BOSS伤害总览";
+        public const string File_AuctionStatements = "仓鼠历史拍卖";
+        public const string File_Questionnaires = "问卷调查";
+        public const string File_ClubChatroom = "微信群总览";
+
+    
+        #endregion
     }
 }

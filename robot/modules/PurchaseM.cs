@@ -69,11 +69,11 @@ namespace RS.Snail.JJJ.robot.modules
             // group    mgr     提醒      
             // group    member  
 
-            var role = _context.ContactsM.QueryRole(msg.Self, msg.WXID, msg.Scene == include.ChatScene.Group ? msg.Sender : "");
+            var role = _context.ContactsM.QueryRole(msg.Sender, msg.RoomID);
             if (role == include.UserRole.ADMINISTRATOR) return (true, null);
 
 
-            var club = _context.ClubsM.FindClub(msg.Self, rid);
+            var club = _context.ClubsM.FindClub(rid);
             if (club is null) return (false, null);
             if (club.PurchaseEnd == long.MinValue) return (true, null);
 

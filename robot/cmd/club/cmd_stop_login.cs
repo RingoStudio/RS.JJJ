@@ -29,7 +29,7 @@ namespace RS.Snail.JJJ.robot.cmd.club
         public ChatScene EnableScene => ChatScene.All;
         public UserRole MinRole => UserRole.GROUP_MANAGER;
         public WechatMessageType AcceptMessageType => WechatMessageType.Text;
-        async public Task Do(Message msg)
+        public void Do(Message msg)
         {
             try
             {
@@ -37,52 +37,42 @@ namespace RS.Snail.JJJ.robot.cmd.club
                 var arr = msg.ExplodeContent;
                 var rid = "";
                 if (arr.Length > 1) rid = arr[1];
-
+                var isAdmin = _context.ContactsM.IsAdmin(msg.Sender);
                 // 群聊下可设置为
-                var role = _context.ContactsM.QueryRole(msg.Self, msg.WXID, msg.Scene == ChatScene.Group ? msg.Sender : "");
-                if (rid == "此俱乐部" || rid.ToLower() == "cjlb" || (string.IsNullOrEmpty(rid) && role < UserRole.ADMINISTRATOR))
+                if (rid == "此俱乐部" || rid.ToLower() == "cjlb" || (string.IsNullOrEmpty(rid) && (!isAdmin)))
                 {
                     if (msg.Scene == ChatScene.Group) return;
-                    var group = _context.ContactsM.FindGroup(msg.Self, msg.Sender);
+                    var group = _context.ContactsM.FindGroup(msg.RoomID);
                     if (group is null) return;
                     rid = group.RID ?? "";
                 }
                 if (StringHelper.IsRID(rid))
                 {
-                    if (!_context.ContactsM.CheckGroupRole(msg.Self, rid, msg.WXID, msg.Scene == ChatScene.Group ? msg.Sender : ""))
+                    if (_context.ContactsM.QueryRole(msg.Sender, rid: rid) < MinRole)
                     {
-                        _context.WechatM.SendAtText($"不可以终止其他俱乐部的登录。",
-                                                 new List<string> { msg.WXID },
-                                                 msg.Self,
-                                                 msg.Sender);
+                        _context.WechatM.SendAtText($"不可以终止其他俱乐部的登录。", new List<string> { msg.Sender }, msg.RoomID);
                         return;
                     }
                 }
                 else rid = "";
-                if (role < UserRole.ADMINISTRATOR)
+                if (!isAdmin)
                 {
                     if (string.IsNullOrEmpty(rid)) return;
                     if (!CommonValidate.CheckPurchase(_context, msg, rid)) return;
                 }
 
                 var result = _context.SnailsM.StopLogin(rid);
-                var desc = string.IsNullOrEmpty(rid) ? "[所有俱乐部]" : $"[{_context.ClubsM.QueryClubName(msg.Self, rid) ?? rid}]";
+                var desc = string.IsNullOrEmpty(rid) ? "[所有俱乐部]" : $"[{_context.ClubsM.QueryClubName(rid) ?? rid}]";
                 if (result.result) desc = $"终止{desc}登录成功。";
                 else desc = $"终止{desc}登录失败，原因：{result.desc}";
 
-                _context.WechatM.SendAtText(desc,
-                                            new List<string> { msg.WXID },
-                                            msg.Self,
-                                            msg.Sender);
+                _context.WechatM.SendAtText(desc, new List<string> { msg.Sender }, msg.RoomID);
 
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, Tag);
-                _context.WechatM.SendAtText("⚠️因未知原因，操作失败了。",
-                                                new List<string> { msg.WXID },
-                                                msg.Self,
-                                                msg.Sender);
+                Context.Logger.WriteException(ex, Tag);
+                _context.WechatM.SendAtText("⚠️因未知原因，操作失败了。", new List<string> { msg.Sender }, msg.RoomID);
             }
         }
     }

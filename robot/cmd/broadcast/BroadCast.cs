@@ -9,12 +9,12 @@ namespace RS.Snail.JJJ.robot.cmd.broadcast
 {
     internal class BroadCast
     {
-        public string ID { get => $"{Self}_{Sender}_{Wxid}"; }
+        public string ID { get => $"{Self}_{Sender}_{RoomID}"; }
         public string Key;
         public string RID;
         public string Self;
         public string Sender;
-        private string Wxid;
+        private string RoomID;
         public List<string> Content = new List<string>();
         public List<string> Files = new List<string>();
         public List<string> Images = new List<string>();
@@ -33,12 +33,12 @@ namespace RS.Snail.JJJ.robot.cmd.broadcast
         {
             this.Sender = msg.Sender;
             this.Self = msg.Self;
-            this.Wxid = msg.WXID;
+            this.RoomID = msg.RoomID;
         }
 
         public static string GetID(Message msg)
         {
-            return $"{msg.Self}_{msg.Sender}_{msg.WXID}";
+            return $"{msg.Self}_{msg.Sender}_{msg.RoomID}";
         }
     }
 }

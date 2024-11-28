@@ -39,6 +39,6 @@ namespace RS.Snail.JJJ.robot.cmd
         /// <param name="context"></param>
         /// <param name="message"></param>
         /// <returns></returns>
-        public Task Do(Message message);
+        public void Do(Message message);
     }
 }

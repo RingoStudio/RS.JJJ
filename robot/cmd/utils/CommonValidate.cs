@@ -26,10 +26,7 @@ namespace RS.Snail.JJJ.robot.cmd.utils
             {
                 if (!string.IsNullOrEmpty(purchase.desc))
                 {
-                    context.WechatM.SendAtText(purchase.desc,
-                                               new List<string> { msg.WXID },
-                                               msg.Self,
-                                               msg.Sender);
+                    context.WechatM.SendAtText(purchase.desc, new List<string> { msg.Sender }, msg.RoomID);
                 }
                 return false;
             }

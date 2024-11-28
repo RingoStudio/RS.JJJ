@@ -33,7 +33,7 @@ namespace RS.Snail.JJJ.clone
         {
             get
             {
-                var ourName = _context.WechatM.FindWechatCFG(RobotWXID)?.OurName ?? "唧唧叽";
+                var ourName = _context.WechatM.WechatCFG()?.OurName ?? "唧唧叽";
                 if (string.IsNullOrEmpty(_name)) return $"{ourName}俱乐部";
                 if (ourName == "冰法集团" && !_name.Contains("冰法")) return $"冰法{_name}";
                 return _name;
@@ -42,9 +42,8 @@ namespace RS.Snail.JJJ.clone
         }
 
         public Dictionary<string, string> AccountPasswords { get; set; }
-        public Dictionary<string, string> AccountUIDs { get; set; }
+        public Dictionary<string, string> AccountUIDs { get; set; } = new();
 
-        public string RobotWXID { get; set; }
         /// <summary>
         /// 俱乐部成员名单
         /// </summary>
@@ -61,6 +60,11 @@ namespace RS.Snail.JJJ.clone
         /// 渠道类型
         /// </summary>
         public ChannelType ChannelType { get; private set; }
+        /// <summary>
+        /// 是否启用自动登录配置表
+        /// </summary>
+        public bool AutoLoginSheetApplied { get; set; }
+        public List<AutoLoginConfig> AutoLoginConfigs { get; set; }
         #endregion
 
         #region SETTINGS
@@ -69,7 +73,7 @@ namespace RS.Snail.JJJ.clone
         /// </summary>
         public bool RemindContentNotCombine { get; set; } = false;
         /// <summary>
-        /// 是否开启登陆后自动提醒
+        /// 是否开启登录后自动提醒
         /// </summary>
         public bool RemindAfterLogin { get; set; }
         /// <summary>
@@ -124,6 +128,27 @@ namespace RS.Snail.JJJ.clone
         /// 布阵图显示战力数值
         /// </summary>
         public bool KitImageShowValue { get; set; }
+        /// <summary>
+        /// 不需要自动提醒挖矿
+        /// </summary>
+        public bool DontRemindMine { get; set; }
+        /// <summary>
+        /// 不需要自动提醒挖矿
+        /// </summary>
+        public bool DontRemindTokens { get; set; }
+
+        /// <summary>
+        /// 提醒钻头剩余下限
+        /// </summary>
+        public int RemindDrillLowerLimit { get; set; }
+        /// <summary>
+        /// 钻头达标数(多)
+        /// </summary>
+        public int DrillUseLimit1 { get; set; }
+        /// <summary>
+        /// 钻头达标数(少)
+        /// </summary>
+        public int DrillUseLimit2 { get; set; }
         #endregion
 
         #region DATA
@@ -179,12 +204,11 @@ namespace RS.Snail.JJJ.clone
         #endregion
 
         #region INIT
-        public Club(Context context, string robotWxid, string rid, ChannelType chennelType)
+        public Club(Context context, string rid, ChannelType chennelType)
         {
             _context = context;
             RID = rid;
             ChannelType = chennelType;
-            RobotWXID = robotWxid;
             Members = new List<string>();
             GroupWarData = new Dbase(_context, new JObject());
             PurchaseStart = TimeHelper.ToTimeStamp();
@@ -197,7 +221,6 @@ namespace RS.Snail.JJJ.clone
             if (data is not JObject) return;
             RID = JSONHelper.ParseString(data.rid);
             _name = CryptoHelper.DecryptBase64(JSONHelper.ParseString(data.name));
-            RobotWXID = JSONHelper.ParseString(data.robot_wxid);
             Members = JSONHelper.ParseStringList(data.members) ?? new List<string>();
             LastLoginTime = JSONHelper.ParseLong(data.last_login_time);
             LastLoginUID = JSONHelper.ParseString(data.last_login_uid);
@@ -220,11 +243,17 @@ namespace RS.Snail.JJJ.clone
 
             DontRemindClubMemberChanged = JSONHelper.ParseBool(data.dont_remind_club_member_changed);
             DontRemindGroupMemberChanged = JSONHelper.ParseBool(data.dont_remind_group_member_changed);
+            DontRemindMine = JSONHelper.ParseBool(data.dont_remind_mine);
+            DontRemindTokens = JSONHelper.ParseBool(data.dont_remind_tokens);
+            RemindDrillLowerLimit = JSONHelper.ParseInt(data.remind_drill_lower_limit);
+            DrillUseLimit1 = JSONHelper.ParseInt(data.drill_use_limit_1);
+            DrillUseLimit2 = JSONHelper.ParseInt(data.drill_use_limit_2);
 
             DistDesc = JSONHelper.ParseString(data.dist_desc);
             DistSort = JSONHelper.ParseInt(data.dist_sort);
+            DistCombine = JSONHelper.ParseInt(data.dist_combine);
 
-            Map = JSONHelper.ParseString(data._map);
+            Map = JSONHelper.ParseString(data.map);
             UpdateTime = JSONHelper.ParseLong(data.update_time);
 
             AccountPasswords = JSONHelper.ParseDicStrStr(data.account_passwords);
@@ -238,6 +267,17 @@ namespace RS.Snail.JJJ.clone
 
             PurchaseStart = JSONHelper.ParseLong(data.purchase_start);
             PurchaseEnd = JSONHelper.ParseLong(data.purchase_end);
+            LoginSort = JSONHelper.ParseInt(data.login_sort);
+
+            AutoLoginSheetApplied = JSONHelper.ParseBool(data.auto_login_sheet_applied);
+            AutoLoginConfigs = new();
+            if (AutoLoginSheetApplied && data.auto_login_configs is not null)
+            {
+                foreach (var config in data.auto_login_configs)
+                {
+                    AutoLoginConfigs.Add(new(config));
+                }
+            }
         }
         #endregion
 
@@ -304,7 +344,7 @@ namespace RS.Snail.JJJ.clone
         public string LastLoginDesc()
         {
             if (string.IsNullOrEmpty(LastLoginUID)) return "无记录";
-            var user = _context.ClubsM.FindMember(RobotWXID, LastLoginUID);
+            var user = _context.ClubsM.FindMember(LastLoginUID);
             var name = "";
             if (user is not null) name = $"{user.Name}";
             else name = LastLoginUID;
@@ -318,7 +358,7 @@ namespace RS.Snail.JJJ.clone
         /// <returns></returns>
         public string LoginAccountDesc()
         {
-            if (AccountPasswords.Count <= 0) return $"俱乐部[{Name} {RID}]没有设置任何登陆账号。";
+            if (AccountPasswords.Count <= 0) return $"俱乐部[{Name} {RID}]没有设置任何登录账号。";
             var list = new List<string> { $"俱乐部[{Name} {RID}]共有 {AccountPasswords.Count} 个登录账号：" };
             foreach (var item in AccountPasswords)
             {
@@ -326,7 +366,7 @@ namespace RS.Snail.JJJ.clone
                 if (AccountUIDs.ContainsKey(account))
                 {
                     var uid = AccountUIDs[account];
-                    var user = _context.ClubsM.FindMember(RobotWXID, uid);
+                    var user = _context.ClubsM.FindMember(uid);
                     if (user is not null) account = $"{user.Name}[{account}]";
                     else account = $"{account}[{uid}]";
                 }
@@ -349,23 +389,23 @@ namespace RS.Snail.JJJ.clone
         /// <summary>
         /// 更新成员名单
         /// </summary>
-        /// <param name="members"></param>
+        /// <param name="latestMembers"></param>
         /// <returns></returns>
-        public (List<string> curMembers, List<string> newMembers, List<string> removedMembers) UpdateMembers(List<string> members)
+        public (List<string> curMembers, List<string> newMembers, List<string> removedMembers) UpdateMembers(List<string> latestMembers)
         {
             var newMembers = new List<string>();
             var removedMembers = new List<string>();
-            foreach (var member in members)
+            foreach (var member in latestMembers)
             {
                 if (!Members.Contains(member)) newMembers.Add(member);
             }
 
             foreach (var member in Members)
             {
-                if (!member.Contains(member)) removedMembers.Add(member);
+                if (!latestMembers.Contains(member)) removedMembers.Add(member);
             }
 
-            Members = members;
+            Members = latestMembers;
 
             return (Members, newMembers, removedMembers);
         }
@@ -376,7 +416,6 @@ namespace RS.Snail.JJJ.clone
             {
                 rid = RID,
                 name = CryptoHelper.EncryptBase64(_name),
-                robot_wxid = RobotWXID,
                 members = Members,
                 last_login_time = LastLoginTime,
                 last_login_uid = LastLoginUID,
@@ -400,6 +439,11 @@ namespace RS.Snail.JJJ.clone
 
                 dont_remind_club_member_changed = DontRemindClubMemberChanged,
                 dont_remind_group_member_changed = DontRemindGroupMemberChanged,
+                dont_remind_mine = DontRemindMine,
+                dont_remind_tokens = DontRemindTokens,
+                remind_drill_lower_limit = RemindDrillLowerLimit,
+                drill_use_limit_1 = DrillUseLimit1,
+                drill_use_limit_2 = DrillUseLimit2,
 
                 account_passwords = AccountPasswords,
                 account_uids = AccountUIDs,
@@ -409,6 +453,7 @@ namespace RS.Snail.JJJ.clone
 
                 dist_desc = DistDesc,
                 dist_sort = DistSort,
+                dist_combine = DistCombine,
 
                 combat_record = CombatRecord,
 
@@ -416,10 +461,111 @@ namespace RS.Snail.JJJ.clone
 
                 purchase_start = PurchaseStart,
                 purchase_end = PurchaseEnd,
+                login_sort = LoginSort,
+
+                auto_login_sheet_applied = AutoLoginSheetApplied,
+                auto_login_configs = ((AutoLoginConfigs is null || AutoLoginConfigs.Count == 0) ? new JArray() : JArray.FromObject(AutoLoginConfigs.Select(x => x.GetJO()))),
             });
         }
-
-
         #endregion
+
+        #region AUTO LOGIN
+        public bool IsAutoLoginTimeTagExist(string tag)
+        {
+            if (AutoLoginConfigs is null || AutoLoginConfigs.Count == 0) return false;
+            return AutoLoginConfigs.Where(x => x.GetScheduleTimeTag() == tag).Any();
+        }
+
+        public AutoLoginConfig? QueryAutoLoginConfig(string tag)
+        {
+            if (AutoLoginConfigs is null || AutoLoginConfigs.Count == 0) return null;
+            return AutoLoginConfigs.Where(x => x.GetScheduleTimeTag() == tag).FirstOrDefault();
+        }
+        public List<string> AllAutoLoginTimeTag() => AutoLoginConfigs.Where(x => x.isEnable)
+                                                                     .Select(x => x.GetScheduleTimeTag()).ToList();
+        public string GetAutoLoginConfigsDesc()
+        {
+            if (AutoLoginConfigs is null || AutoLoginConfigs.Count == 0) return "俱乐部自动登录配置表为空，目前无法进行自动登录。";
+            var ret = new List<string>();
+            ret.Add("俱乐部自动登录配置表详情:\n(●表示提醒金银牌，■表示提醒挖矿，▲表示提醒钻头，⬟表示提醒物种历史)");
+            foreach (var item in AutoLoginConfigs)
+            {
+                if (!item.isEnable) continue;
+                ret.Add(item.GetDesc());
+            }
+
+            return string.Join("\n", ret);
+        }
+        #endregion
+    }
+
+    internal class AutoLoginConfig
+    {
+        public int weekday;
+        public int index;
+        public string time;
+        public bool isEnable;
+        public bool remindTokens;
+        public bool remindMines;
+        public bool remindDrills;
+        public bool remindGW;
+
+        public AutoLoginConfig(dynamic data)
+        {
+            weekday = JSONHelper.ParseInt(data.weekday);
+            index = JSONHelper.ParseInt(data.index);
+            time = JSONHelper.ParseString(data.time);
+            isEnable = JSONHelper.ParseBool(data.isEnable);
+            remindTokens = JSONHelper.ParseBool(data.remindTokens);
+            remindMines = JSONHelper.ParseBool(data.remindMines);
+            remindDrills = JSONHelper.ParseBool(data.remindDrills);
+            remindGW = JSONHelper.ParseBool(data.remindGW);
+
+            isEnable = isEnable && CheckTimeVal();
+        }
+        public dynamic GetJO()
+        {
+            dynamic ret = new JObject();
+            ret.weekday = weekday;
+            ret.index = index;
+            ret.time = time;
+            ret.isEnable = isEnable;
+            ret.remindTokens = remindTokens;
+            ret.remindMines = remindMines;
+            ret.remindDrills = remindDrills;
+            ret.remindGW = remindGW;
+            return ret;
+        }
+        public bool CheckTimeVal()
+        {
+            if (string.IsNullOrEmpty(time)) return false;
+            var arr = time.Split(":");
+            if (arr.Length < 2) return false;
+            foreach (var item in arr)
+            {
+                if (!StringHelper.IsInt(item)) return false;
+            }
+            var hour = Convert.ToInt32(arr[0]);
+            var minute = Convert.ToInt32(arr[1]);
+            int sec = 0;
+            if (arr.Length > 2) sec = Convert.ToInt32(arr[2]);
+            return (hour >= 0 && hour <= 24 && minute >= 0 && minute <= 59 && sec >= 0 && sec <= 59);
+        }
+
+        public string GetScheduleTimeTag()
+        {
+            if (!isEnable) return "";
+            var arr = time.Split(":");
+            var hour = Convert.ToInt32(arr[0]);
+            var minute = arr.Length > 1 ? Convert.ToInt32(arr[1]) : 0;
+            var sec = arr.Length > 2 ? Convert.ToInt32(arr[2]) : 0;
+            return $"{weekday}-{hour}-{minute}-{sec}";
+        }
+        public string GetDesc()
+        {
+
+            return $"{misc.WeekdayDesc(weekday)}{time} {(remindTokens ? "●" : "")}{(remindMines ? "■" : "")}{(remindDrills ? "▲" : "")}{(remindGW ? "⬟" : "")}";
+        }
+
     }
 }

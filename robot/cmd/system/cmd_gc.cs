@@ -27,33 +27,23 @@ namespace RS.Snail.JJJ.robot.cmd.system
         public ChatScene EnableScene => ChatScene.All;
         public UserRole MinRole => UserRole.ADMINISTRATOR;
         public WechatMessageType AcceptMessageType => WechatMessageType.Text;
-        async public Task Do(Message msg)
+        public void Do(Message msg)
         {
-
-            await Task.Run(() =>
-             {
-                 try
-                 {
-                     var before = RS.Snail.JJJ.utils.SystemInfoHelper.GetMemory();
-                     System.GC.Collect();
-                     var after = RS.Snail.JJJ.utils.SystemInfoHelper.GetMemory();
-                     _context.WechatM.SendAtText($"释放内存成功\n" +
-                                                  $"释放前私有内存占用 {before:N2} MB\n" +
-                                                  $"释放后私有内存占用 {after:N2} MB",
-                                                    new List<string> { msg.WXID },
-                                                    msg.Self,
-                                                    msg.Sender);
-                 }
-                 catch (Exception ex)
-                 {
-                     Context.Logger.Write(ex, Tag);
-                     _context.WechatM.SendAtText("⚠️因未知原因，操作失败了。",
-                                                 new List<string> { msg.WXID },
-                                                 msg.Self,
-                                                 msg.Sender);
-                 }
-             });
-
+            try
+            {
+                var before = RS.Snail.JJJ.utils.SystemInfoHelper.GetMemory();
+                System.GC.Collect();
+                var after = RS.Snail.JJJ.utils.SystemInfoHelper.GetMemory();
+                _context.WechatM.SendAtText($"释放内存成功\n" +
+                                             $"释放前私有内存占用 {before:N2} MB\n" +
+                                             $"释放后私有内存占用 {after:N2} MB",
+                                             new List<string> { msg.Sender }, msg.RoomID);
+            }
+            catch (Exception ex)
+            {
+                Context.Logger.WriteException(ex, Tag);
+                _context.WechatM.SendAtText("⚠️因未知原因，操作失败了。", new List<string> { msg.Sender }, msg.RoomID);
+            }
         }
     }
 }

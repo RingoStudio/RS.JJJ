@@ -2,6 +2,7 @@
 using RS.Snail.JJJ.robot.modules;
 using RS.Snail.JJJ.utils;
 using RS.Tools.Common.Utils;
+using RS.WechatFerry.model;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -23,20 +24,22 @@ namespace RS.Snail.JJJ.boot
         #region INIT
         private void InitModules()
         {
-            ConfigsM = new ConfigsM(this);
-            ScheduleM = new ScheduleM(this);
-            BackupM = new BackupM(this);
-            ContactsM = new ContactsM(this);
-            ClubsM = new ClubsM(this);
-            CdM = new CdM(this);
-            CommunicateM = new CommunicateM(this);
-            GroupWarEventsM = new GroupWarEventsM(this);
-            WechatM = new WechatM(this);
-            PurchaseM = new PurchaseM(this);
-            SnailsM = new SnailsM(this);
-            ConversationM = new ConversationM(this);
-            QuestionnaireM = new QuestionnaireM(this);
-            QianM = new QianM(this);
+            ConfigsM = new(this);
+            ScheduleM = new(this);
+            BackupM = new(this);
+            ContactsM = new(this);
+            ClubsM = new(this);
+            CdM = new(this);
+            CommunicateM = new(this);
+            GroupWarEventsM = new(this);
+            WechatM = new(this);
+            PurchaseM = new(this);
+            SnailsM = new(this);
+            ConversationM = new(this);
+            QuestionnaireM = new(this);
+            QianM = new(this);
+            MaydayM = new(this);
+            HandbookM = new(this);
 
             Console.WriteLine("唧唧叽正在初始化");
             ConfigsM.Init();
@@ -79,6 +82,9 @@ namespace RS.Snail.JJJ.boot
             ShowInitDialog("初始化调查问卷 QuestionnaireM");
 
             QianM.Init();
+            MaydayM.Init();
+            HandbookM.Init();
+
             ShowInitDialog("唧唧叽初始化完成");
             Console.WriteLine("");
             Console.WriteLine("");
@@ -149,6 +155,8 @@ namespace RS.Snail.JJJ.boot
 
         public GroupWarEventsM GroupWarEventsM { get; private set; }
         public QianM QianM { get; private set; }
+        public MaydayM MaydayM { get; private set; }
+        public HandbookM HandbookM { get; private set; }
         #endregion
 
         #region COMMUNICATE WECHAT
@@ -164,6 +172,7 @@ namespace RS.Snail.JJJ.boot
         public void Started()
         {
             WechatM.SendMgrNotice($"你好，我是唧唧叽，很高兴为你服务！", atAdmins: true);
+            WechatM.StartReceive();
         }
         /// <summary>
         /// 重新启动当前主程序
@@ -172,9 +181,11 @@ namespace RS.Snail.JJJ.boot
         {
             Task.Run(() =>
             {
+                WechatM.StopReceive();
                 WechatM.ClearMessageQueue();
                 WechatM.SendMgrNotice($"{robot.include.emoji.ZHUYI}唧唧叽将在{interval}秒后重启，待会见！", atAdmins: true);
                 Thread.Sleep(interval * 1000);
+                WechatM.StopWCF();
                 BackupM.SaveNow();
                 System.Diagnostics.Process.Start("RS.Snail.JJJ.exe", "restart");
                 Console.WriteLine("bye");
@@ -189,8 +200,10 @@ namespace RS.Snail.JJJ.boot
             Task.Run(() =>
             {
                 WechatM.ClearMessageQueue();
+                WechatM.StopReceive();
                 WechatM.SendMgrNotice($"{robot.include.emoji.ZHUYI}唧唧叽将在{interval}秒后关闭，后会有期！", atAdmins: true);
                 Thread.Sleep(interval * 1000);
+                WechatM.StopWCF();
                 BackupM.SaveNow();
                 Console.WriteLine("bye");
                 System.Environment.Exit(0);
@@ -215,31 +228,37 @@ namespace RS.Snail.JJJ.boot
                 }
 
                 var commaond = new List<string>();
-                var sender = "ringoo";
                 var wxid = "ringoo";
                 var atJJJ = false;
+                var isGroup = false;
+                var roomId = "";
                 foreach (var item in input.Split(" "))
                 {
                     if (item == "jjj") atJJJ = true;
-                    else if (item == "g") sender = "21167191107@chatroom";
-                    else if (item == "p") sender = "ringoo";
+                    else if (item == "g")
+                    {
+                        roomId = "21167191107@chatroom";
+                        isGroup = true;
+                    }
+                    else if (item == "p") wxid = "ringoo";
                     else commaond.Add(item);
                 }
-                dynamic msg = JObject.FromObject(new
-                {
-                    message = string.Join(" ", commaond),
-                    self = "wxid_kdtmblfixewp12",
-                    msgid = new Random().NextInt64(),
-                    filepath = "",
-                    sender = sender,
-                    wxid = wxid,
-                    timestamp = TimeHelper.ToTimeStamp(),
-                    type = (int)RS.Tools.Common.Enums.WechatMessageType.Text,
-                });
+                RecvMsg msg = new(isSelf: false,
+                                  isGroup: isGroup,
+                                  ID: (ulong)(new Random().NextInt64()),
+                                  type: Tools.Common.Enums.WechatMessageType.Text,
+                                  timeStamp: (ulong)TimeHelper.ToTimeStamp(),
+                                  roomID: roomId,
+                                  content: string.Join(" ", commaond),
+                                  sender: wxid,
+                                  sign: "",
+                                  thumb: "",
+                                  extra: "",
+                                  xml: "");
 
                 CommunicateM.ReceiveMessage(msg);
 
-           
+
 
             } while (true);
         }

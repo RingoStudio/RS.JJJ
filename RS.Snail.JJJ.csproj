@@ -2,26 +2,33 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net6.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <AssemblyVersion>1.0.0.23119</AssemblyVersion>
-    <FileVersion>1.0.0.23119</FileVersion>
+    <AssemblyVersion>1.0.0.24326</AssemblyVersion>
+    <FileVersion>1.0.0.24326</FileVersion>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="SharpCompress" Version="0.38.0" />
     <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="7.0.0" />
+    <PackageReference Include="System.Management" Version="8.0.0" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\Tools\Excel\RS.Tools.Excel.csproj" />
+    <ProjectReference Include="..\..\..\WechatFerry\RS.WechatFerry.csproj" />
     <ProjectReference Include="..\Client\RS.Snail.JJJ.Client.csproj" />
     <ProjectReference Include="..\QCSDK\RS.Snail.QCSDK.csproj" />
-    <ProjectReference Include="..\Wechat\RS.Snail.JJJ.Wechat.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="robot\cmd\handbook\" />
+    <Service Include="{508349b6-6b84-4df5-91f0-309beebad82d}" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="docs\" />
   </ItemGroup>
 
 </Project>

@@ -21,9 +21,11 @@ namespace RS.Snail.JJJ.robot.include
         public static string DRILL = "⛏️";
         public static string SPE1 = "🪲";
         public static string SPE2 = "🐠";
-        public static string SPE3 = "🦪";
+        public static string SPE3 = "🐚";
         public static string SPE4 = "🐹";
         public static string SPE5 = "🦗";
+        public static string LOCATION = "📍";
+        public static string OK = "👌";
 
     }
 }

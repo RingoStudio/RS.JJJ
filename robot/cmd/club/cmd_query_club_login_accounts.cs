@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 
 namespace RS.Snail.JJJ.robot.cmd.club
 {
-    
+
     internal class cmd_query_club_login_accounts : ICMD
     {
         public Context _context { get; set; }
@@ -28,7 +28,7 @@ namespace RS.Snail.JJJ.robot.cmd.club
         public UserRole MinRole => UserRole.GROUP_MANAGER;
         public WechatMessageType AcceptMessageType => WechatMessageType.Text;
 
-        async public Task Do(Message msg)
+        public void Do(Message msg)
         {
             try
             {
@@ -39,7 +39,7 @@ namespace RS.Snail.JJJ.robot.cmd.club
 
                 if (msg.Scene == ChatScene.Group && string.IsNullOrEmpty(rid))
                 {
-                    var group = _context.ContactsM.FindGroup(msg.Self, msg.Sender);
+                    var group = _context.ContactsM.FindGroup(msg.RoomID);
                     if (group is null) return;
 
                     rid = group.RID;
@@ -47,40 +47,28 @@ namespace RS.Snail.JJJ.robot.cmd.club
                 }
 
 
-                if (!_context.ContactsM.CheckGroupRole(msg.Self, rid, msg.WXID, msg.Scene == ChatScene.Group ? msg.Sender : ""))
+                if (_context.ContactsM.QueryRole(msg.Sender, rid: rid) < MinRole)
                 {
-                    _context.WechatM.SendAtText($"不可以查看其他俱乐部的登陆账号。",
-                                             new List<string> { msg.WXID },
-                                             msg.Self,
-                                             msg.Sender);
+                    _context.WechatM.SendAtText($"不可以查看其他俱乐部的登录账号。", new List<string> { msg.Sender }, msg.RoomID);
                     return;
                 }
 
-                var club = _context.ClubsM.FindClub(msg.Self, rid);
+                var club = _context.ClubsM.FindClub(rid);
                 if (club is null)
                 {
-                    _context.WechatM.SendAtText("没有找到这个俱乐部。",
-                                                new List<string> { msg.WXID },
-                                                msg.Self,
-                                                msg.Sender);
+                    _context.WechatM.SendAtText("没有找到这个俱乐部。", new List<string> { msg.Sender }, msg.RoomID);
                     return;
                 }
 
                 if (!CommonValidate.CheckPurchase(_context, msg, rid)) return;
 
-                _context.WechatM.SendAtText(club.LoginAccountDesc(),
-                                       new List<string> { msg.WXID },
-                                       msg.Self,
-                                       msg.Sender);
+                _context.WechatM.SendAtText(club.LoginAccountDesc(), new List<string> { msg.Sender }, msg.RoomID);
 
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, Tag);
-                _context.WechatM.SendAtText("⚠️因未知原因，操作失败了。",
-                                                new List<string> { msg.WXID },
-                                                msg.Self,
-                                                msg.Sender);
+                Context.Logger.WriteException(ex, Tag);
+                _context.WechatM.SendAtText("⚠️因未知原因，操作失败了。", new List<string> { msg.Sender }, msg.RoomID);
             }
         }
     }

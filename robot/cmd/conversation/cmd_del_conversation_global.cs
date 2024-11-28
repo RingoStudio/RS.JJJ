@@ -28,7 +28,7 @@ namespace RS.Snail.JJJ.robot.cmd.conversation
         public ChatScene EnableScene => ChatScene.All;
         public UserRole MinRole => UserRole.ADMINISTRATOR;
         public WechatMessageType AcceptMessageType => WechatMessageType.Text;
-        async public Task Do(Message msg)
+        public void Do(Message msg)
         {
             try
             {
@@ -43,32 +43,22 @@ namespace RS.Snail.JJJ.robot.cmd.conversation
                 if (string.IsNullOrEmpty(key))
                 {
                     var tip = new List<string>();
-                    _context.WechatM.SendAtText($"在删除对话内容时，您输入了空的关键字，删除失败。",
-                                                 new List<string> { msg.WXID },
-                                                 msg.Self,
-                                                 msg.Sender);
+                    _context.WechatM.SendAtText($"在删除对话内容时，您输入了空的关键字，删除失败。", new List<string> { msg.Sender }, msg.RoomID);
                     return;
                 }
 
-                var result = _context.ConversationM.UpdateGroupConversation(rid, key, "");
+                var result = _context.ConversationM.DeleteGlobalConversation(key);
                 if (result)
                 {
                     var desc = $"已经删除了以下全局对话内容\n" +
                               $"关键字：{key}\n";
-                    _context.WechatM.SendAtText(desc,
-                                               new List<string> { msg.WXID },
-                                               msg.Self,
-                                               msg.Sender);
+                    _context.WechatM.SendAtText(desc, new List<string> { msg.Sender }, msg.RoomID);
                 }
-                else _context.WechatM.SendAtText("可能是因为关键字不存在，或其他原因，删除全局对话失败了。",
-                                                new List<string> { msg.WXID },
-                                                msg.Self,
-                                                msg.Sender);
-
+                else _context.WechatM.SendAtText("可能是因为关键字不存在，或其他原因，删除全局对话失败了。", new List<string> { msg.Sender }, msg.RoomID);
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, Tag);
+                Context.Logger.WriteException(ex, Tag);
             }
         }
     }

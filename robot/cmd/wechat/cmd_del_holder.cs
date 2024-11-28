@@ -27,7 +27,7 @@ namespace RS.Snail.JJJ.robot.cmd.wechat
         public UserRole MinRole => UserRole.ADMINISTRATOR;
         public WechatMessageType AcceptMessageType => WechatMessageType.Text;
 
-        async public Task Do(Message msg)
+        public void Do(Message msg)
         {
             try
             {
@@ -40,42 +40,31 @@ namespace RS.Snail.JJJ.robot.cmd.wechat
                 if (!StringHelper.IsRID(rid)) return;
 
                 // 找到俱乐部
-                var club = _context.ClubsM.FindClub(msg.Self, rid);
+                var club = _context.ClubsM.FindClub(rid);
 
                 if (club is null)
                 {
-                    _context.WechatM.SendAtText($"⚠️要设置的俱乐部[{rid}]不存在。",
-                                                new List<string> { msg.WXID },
-                                                msg.Self,
-                                                msg.Sender);
+                    _context.WechatM.SendAtText($"⚠️要设置的俱乐部[{rid}]不存在。", new List<string> { msg.Sender }, msg.RoomID);
                     return;
                 }
 
-                var curHolder = _context.ContactsM.QueryClubHolder(msg.Self, rid);
+                var curHolder = _context.ContactsM.QueryClubHolderWXID(rid);
                 if (string.IsNullOrEmpty(curHolder))
                 {
-                    _context.WechatM.SendAtText($"⚠️俱乐部[{club?.Name ?? "新俱乐部"}-{rid}]目前尚未指派会长。",
-                                                new List<string> { msg.WXID },
-                                                msg.Self,
-                                                msg.Sender);
+                    _context.WechatM.SendAtText($"⚠️俱乐部[{club?.Name ?? "新俱乐部"}-{rid}]目前尚未指派会长。", new List<string> { msg.Sender }, msg.RoomID);
                     return;
                 }
 
-                var result = _context.ContactsM.DelHolder(msg.Self, rid);
+                var result = _context.ContactsM.DelHolder(rid);
                 if (result) _context.WechatM.SendAtText($"俱乐部[{club?.Name ?? "新俱乐部"}-{rid}]的会长已被移除。\n" +
                                                        $"⚠️请尽快指派新的会长。",
-                                                       new List<string> { msg.WXID },
-                                                       msg.Self,
-                                                       msg.Sender);
-                else _context.WechatM.SendAtText("⚠️因未知原因，操作失败了。",
-                                                new List<string> { msg.WXID },
-                                                msg.Self,
-                                                msg.Sender);
+                                                       new List<string> { msg.Sender }, msg.RoomID);
+                else _context.WechatM.SendAtText("⚠️因未知原因，操作失败了。", new List<string> { msg.Sender }, msg.RoomID);
 
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, Tag);
+                Context.Logger.WriteException(ex, Tag);
             }
         }
     }

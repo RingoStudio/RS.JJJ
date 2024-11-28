@@ -15,7 +15,7 @@ namespace RS.Snail.JJJ.test
             var now = TimeHelper.ToTimeStamp();
             var duration = $"{TimeHelper.SimpleTimeDescJustDate(RS.Snail.JJJ.Client.core.game.module.TimeM.GetGWWeekStartTimeStatic(now))} - " +
                            $"{TimeHelper.SimpleTimeDescJustDate(RS.Snail.JJJ.Client.core.game.module.TimeM.GetGWWeekEndTimeStatic(now))}";
-            var path = ImageHelper.GetClubKitPlanImage(
+            var path = GWImageHelper.GetClubKitPlanImage(
                  race: "1",
                  type: "按领导力",
                  duration: duration,
@@ -82,7 +82,8 @@ namespace RS.Snail.JJJ.test
                            "苦力一",
                            "苦力一 [锁定]",
                      } },
-                 }
+                 },
+                 locks: new()
                 );
             Console.WriteLine(path);
         }

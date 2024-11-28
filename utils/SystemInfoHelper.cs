@@ -2,10 +2,10 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Management;
 using System.Runtime.Versioning;
 using System.Text;
 using System.Threading.Tasks;
-
 
 namespace RS.Snail.JJJ.utils
 {
@@ -48,6 +48,15 @@ namespace RS.Snail.JJJ.utils
             ret.Add($"RAM占用: {ramAvailable} MB");
             ret.Add($"RAM私有: {GetMemory():N2} MB");
 
+            using (ManagementObjectSearcher searcher = new ManagementObjectSearcher("SELECT * FROM Win32_LogicalDisk WHERE DriveType=3")) // 3 代表本地硬盘
+            {
+                foreach (ManagementObject mo in searcher.Get())
+                {
+                    var total = Convert.ToDouble(mo["Size"]) / 1024 / 1024 / 1024;
+                    var free = Convert.ToDouble(mo["FreeSpace"]) / 1024 / 1024 / 1024;
+                    ret.Add($"磁盘{mo["Name"]}: 剩余{free.ToString("0.00")}GB / 全部{total.ToString("0.00")}GB");
+                }
+            }
             return string.Join("\n", ret);
         }
     }

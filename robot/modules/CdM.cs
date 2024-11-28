@@ -61,7 +61,7 @@ namespace RS.Snail.JJJ.robot.modules
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, "CdM.SaveCSV");
+                Context.Logger.WriteException(ex, "CdM.SaveCSV");
             }
         }
         #endregion
@@ -100,7 +100,7 @@ namespace RS.Snail.JJJ.robot.modules
 
         private string GetKey(Message msg)
         {
-            return $"{msg.Self}-{msg.Sender}-{msg.WXID}-{msg.Type}-{msg.Content}";
+            return $"{msg.Self}-{msg.Sender}-{msg.Type}-{msg.Content}";
         }
         /// <summary>
         /// 添加自定义key

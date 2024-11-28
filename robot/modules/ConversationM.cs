@@ -1,6 +1,7 @@
 ﻿using Newtonsoft.Json.Linq;
 using RS.Snail.JJJ.boot;
 using RS.Snail.JJJ.clone;
+using RS.Snail.JJJ.robot.include;
 using RS.Snail.JJJ.utils;
 using RS.Tools.Common.Utils;
 using System;
@@ -24,7 +25,7 @@ namespace RS.Snail.JJJ.robot.modules
         private bool _inited = false;
         public bool Inited { get => _inited; }
 
-        private ConcurrentDictionary<string, ConcurrentDictionary<string, dynamic>> _conversations;
+        private Dictionary<string, Dictionary<string, dynamic>> _conversations;
         private Dictionary<string, string> _fixedConversation = new Dictionary<string, string>()
         {
             { "你是谁", "我是全新升级的唧唧叽2.0" },
@@ -34,6 +35,8 @@ namespace RS.Snail.JJJ.robot.modules
             { "你爸爸是谁?", "我的爸爸是机会" },
             { "你爸爸是谁？", "我的爸爸是机会" },
         };
+
+        private object _conversationLock = new object();
         #endregion
 
         #region INIT
@@ -71,7 +74,7 @@ namespace RS.Snail.JJJ.robot.modules
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, $"ConversationM.LoadCSV");
+                Context.Logger.WriteException(ex, $"ConversationM.LoadCSV");
             }
         }
 
@@ -93,7 +96,7 @@ namespace RS.Snail.JJJ.robot.modules
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, $"ConversationM.SaveCSV");
+                Context.Logger.WriteException(ex, $"ConversationM.SaveCSV");
             }
 
         }
@@ -109,7 +112,6 @@ namespace RS.Snail.JJJ.robot.modules
         /// <summary>
         /// 更新全局对话
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="key"></param>
         /// <param name="value"></param>
         /// <returns></returns>
@@ -125,23 +127,57 @@ namespace RS.Snail.JJJ.robot.modules
             return true;
         }
         /// <summary>
+        /// 删除全局对话
+        /// </summary>
+        /// <param name="key"></param>
+        /// <returns></returns>
+        public bool DeleteGlobalConversation(string key)
+        {
+            if (_conversations.ContainsKey("") && _conversations[""].ContainsKey(key))
+            {
+                _conversations[""].Remove(key, out _);
+                return true;
+            }
+            return false;
+        }
+        /// <summary>
         /// 更新对话
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <param name="key"></param>
         /// <param name="value"></param>
         /// <returns></returns>
-        public bool UpdateGroupConversation(string rid, string key, string content, List<string> images, List<string> files)
+        public bool UpdateGroupConversation(string rid, string key, string content, List<string>? images = null, List<string>? files = null)
         {
-            if (!_conversations.ContainsKey(rid)) _conversations.TryAdd(rid, new());
-            dynamic response = new JObject();
-            if (!string.IsNullOrEmpty(content)) response.content = content;
-            if (images.Count > 0) response.images = JArray.FromObject(images);
-            if (files.Count > 0) response.files = JArray.FromObject(files);
-            if (!_conversations[rid].ContainsKey(key)) _conversations[rid].TryAdd(key, response);
-            else _conversations[rid][key] = response;
-            return true;
+            lock (_conversationLock)
+            {
+                if (!_conversations.ContainsKey(rid)) _conversations.TryAdd(rid, new());
+                dynamic response = new JObject();
+                if (!string.IsNullOrEmpty(content)) response.content = content;
+                if (images is not null && images.Count > 0) response.images = JArray.FromObject(images);
+                if (files is not null && files.Count > 0) response.files = JArray.FromObject(files);
+                if (!(_conversations[rid]).ContainsKey(key)) (_conversations[rid]).TryAdd(key, response);
+                else _conversations[rid][key] = response;
+                return true;
+            }
+        }
+        /// <summary>
+        /// 删除对话
+        /// </summary>
+        /// <param name="rid"></param>
+        /// <param name="key"></param>
+        /// <returns></returns>
+        public bool DeleteGroupConversation(string rid, string key)
+        {
+            lock (_conversationLock)
+            {
+                if (_conversations.ContainsKey(rid) && _conversations[rid].ContainsKey(key))
+                {
+                    _conversations[rid].Remove(key, out _);
+                    return true;
+                }
+            }
+            return false;
         }
         /// <summary>
         /// 检查对话状态
@@ -152,43 +188,44 @@ namespace RS.Snail.JJJ.robot.modules
         public int CheckConversationKey(string rid, string key)
         {
             if (_fixedConversation.ContainsKey(key)) return 2;
-            if (_conversations.ContainsKey("") && _conversations[""].ContainsKey(key)) return 2;
-            if (_conversations.ContainsKey(rid) && _conversations[rid].ContainsKey(key)) return 1;
+            lock (_conversationLock)
+            {
+                if (_conversations.ContainsKey("") && (_conversations[""]).ContainsKey(key)) return 2;
+                if (_conversations.ContainsKey(rid) && (_conversations[rid]).ContainsKey(key)) return 1;
+            }
             return 0;
         }
+
         /// <summary>
         /// 查询对话
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <param name="key"></param>
         /// <returns></returns>
-        public async Task<dynamic?> QueryConversation(string rid, string wxid, string key, bool isForce = false)
+        public dynamic? QueryConversation(string rid, string wxid, string key, bool isForce = false)
         {
             key = RemoveJJJ(key);
             if (string.IsNullOrEmpty(key)) return null;
 
             if (_fixedConversation.ContainsKey(key)) return _fixedConversation[key];
 
-            if (_conversations.ContainsKey(rid))
+            lock (_conversationLock)
             {
-                if (_conversations[rid].ContainsKey(key)) return _conversations[rid][key];
-            }
-            if (!string.IsNullOrEmpty(rid))
-            {
-                if (_conversations.ContainsKey("") && _conversations[""].ContainsKey(key))
+                if (_conversations.ContainsKey(rid) && _conversations[rid].ContainsKey(key))
+                {
+                    return _conversations[rid][key];
+                }
+                if (!string.IsNullOrEmpty(rid) && _conversations.ContainsKey("") && _conversations[""].ContainsKey(key))
                 {
                     return _conversations[""][key];
                 }
             }
-
-            // TODO: 青云客 API
-            return await QingyunkeHelper.GetResponseAsync(_context, string.IsNullOrEmpty(rid) ? wxid : rid, rid, isForce);
+            return AIConversationHelper.GetResponseAsync(_context, key, string.IsNullOrEmpty(rid) ? wxid : rid, isForce);
         }
 
         private static string RemoveJJJ(string raw)
         {
-            raw = raw.Replace("@", "").Replace($"{(char)0x85}", "").Trim();
+            raw = raw.Replace("@", "").Replace(chars.AtSpliter, "").Trim();
             if (raw.Length < 3) return raw;
             var pinyin = Pinyin.GetPinyin(raw).ToLower();
             if (pinyin == "jijiji") return "";
@@ -207,13 +244,13 @@ namespace RS.Snail.JJJ.robot.modules
             if (response is string)
             {
                 var content = response as string ?? "";
-                if (!string.IsNullOrEmpty(content)) _context.WechatM.SendAtText(content, new List<string> { msg.WXID }, msg.Self, msg.Sender);
+                if (!string.IsNullOrEmpty(content)) _context.WechatM.SendAtText(content, new List<string> { msg.Sender }, msg.RoomID);
             }
             else if (response is JObject)
             {
                 // content
                 var content = JSONHelper.ParseString(response.content);
-                if (!string.IsNullOrEmpty(content)) _context.WechatM.SendAtText(content, new List<string> { msg.WXID }, msg.Self, msg.Sender);
+                if (!string.IsNullOrEmpty(content)) _context.WechatM.SendAtText(content, new List<string> { msg.Sender }, msg.RoomID);
 
                 // image
                 var images = JSONHelper.ParseStringList(response.images);
@@ -222,7 +259,7 @@ namespace RS.Snail.JJJ.robot.modules
                     foreach (var image in images)
                     {
                         if (!System.IO.File.Exists(image)) continue;
-                        _context.WechatM.SendImage(image, msg.Self, msg.Sender);
+                        _context.WechatM.SendImage(image, msg.RoomID);
                     }
                 }
 
@@ -233,7 +270,7 @@ namespace RS.Snail.JJJ.robot.modules
                     foreach (var file in files)
                     {
                         if (!System.IO.File.Exists(file)) continue;
-                        _context.WechatM.SendFile(file, msg.Self, msg.Sender);
+                        _context.WechatM.SendFile(file, msg.RoomID);
                     }
                 }
             }

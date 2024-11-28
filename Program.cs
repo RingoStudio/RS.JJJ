@@ -17,34 +17,19 @@ public class Entry
     private static Context _context;
     static async Task Main(string[] args)
     {
-        //bool isRestart = false;
-        //bool isTest = true;
-        //if (args.Length > 0)
-        //{
-        //    foreach (var item in args)
-        //    {
-        //        if (item == "restart") isRestart = true;
-        //        if (item == "test") isTest = true;
-        //    }
-        //}
-
-        //_context = new Context(isRestart, isTest);
-        //await Input();
-
-
-        do
+        bool isRestart = false;
+        bool isTest = false;
+        if (args.Length > 0)
         {
+            foreach (var item in args)
+            {
+                if (item == "restart") isRestart = true;
+                if (item == "test") isTest = true;
+            }
+        }
 
-            var input = Console.ReadLine() ?? "";
-            if (string.IsNullOrEmpty(input)) continue;
-            var output = await utils.QingyunkeHelper.GetResponse(input);
-            output = JSONHelper.ParseString(JObject.Parse(output)["content"]);
-            Console.BackgroundColor = ConsoleColor.Blue;
-            Console.ForegroundColor = ConsoleColor.White;
-            Console.Write("青云客: ");
-            Console.ResetColor();
-            Console.WriteLine(output);
-        } while (true);
+        _context = new Context(isRestart, isTest);
+        await Input();
     }
 
     // 等待并接收指令

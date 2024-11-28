@@ -30,11 +30,11 @@ namespace RS.Snail.JJJ.robot.cmd.wechat
         private static string _moveGroupTag = "cmd_set_group_move";
 
 
-        async public Task Do(Message msg)
+        public void Do(Message msg)
         {
             try
             {
-                _context.CommunicateM.UnregistWaitMessageRequest(msg.Self, msg.Sender, msg.WXID, _moveGroupTag);
+                _context.CommunicateM.UnregistWaitMessageRequest(msg.RoomID, msg.Sender, _moveGroupTag);
 
                 var arr = msg.ExplodeContent;
 
@@ -45,48 +45,39 @@ namespace RS.Snail.JJJ.robot.cmd.wechat
                 if (!StringHelper.IsRID(rid)) return;
 
                 // 找到俱乐部
-                var club = _context.ClubsM.FindClub(msg.Self, rid);
+                var club = _context.ClubsM.FindClub(rid);
 
                 if (club is null)
                 {
-                    _context.WechatM.SendAtText($"⚠️要设置的俱乐部[{rid}]不存在。",
-                                                new List<string> { msg.WXID },
-                                                msg.Self,
-                                                msg.Sender);
+                    _context.WechatM.SendAtText($"⚠️要设置的俱乐部[{rid}]不存在。", new List<string> { msg.Sender }, msg.RoomID);
                     return;
                 }
 
-                var curHolder = _context.ContactsM.QueryClubHolder(msg.Self, rid);
-                if (string.IsNullOrEmpty(curHolder) || curHolder != msg.WXID)
+                var curHolder = _context.ContactsM.QueryClubHolderWXID(rid);
+                if (string.IsNullOrEmpty(curHolder) || curHolder != msg.Sender)
                 {
                     _context.WechatM.SendAtText($"⚠️你目前不是俱乐部[{club?.Name ?? "新俱乐部"}-{rid}]的会长。\n" +
                                                 $"⚠️此命令必须由当前俱乐部会长本人操作。",
-                                                new List<string> { msg.WXID },
-                                                msg.Self,
-                                                msg.Sender);
+                                                new List<string> { msg.Sender }, msg.RoomID);
                     return;
                 }
 
-                var group = _context.ContactsM.FindGroup(msg.Self, msg.Sender);
+                var group = _context.ContactsM.FindGroup(msg.RoomID);
                 if (group is null)
                 {
                     _context.WechatM.SendAtText($"⚠️唧唧叽缺少当前微信群的资料，请联系超管使用命令\"刷新群信息\"。",
-                                                new List<string> { msg.WXID },
-                                                msg.Self,
-                                                msg.Sender);
+                                                new List<string> { msg.Sender }, msg.RoomID);
                     return;
                 }
 
 
-                var oriGroup = _context.ContactsM.FindGroupByRID(msg.Self, rid);
+                var oriGroup = _context.ContactsM.FindGroupByRID(rid);
                 if (oriGroup is not null)
                 {
                     if (oriGroup.WXID == group.WXID)
                     {
                         _context.WechatM.SendAtText($"当前微信群已经与俱乐部[{club?.Name ?? "新俱乐部"}-{rid}]绑定，无需重复操作。\n",
-                                                    new List<string> { msg.WXID },
-                                                    msg.Self,
-                                                    msg.Sender);
+                                                    new List<string> { msg.Sender }, msg.RoomID);
                         return;
                     }
                     // 当前俱乐部已经绑定在其他群
@@ -99,36 +90,26 @@ namespace RS.Snail.JJJ.robot.cmd.wechat
                                                     $"请注意：\n" +
                                                     $"⚠️请尽量保证新群的成员与旧群的成员保持一致，新群内不存在的成员将丢失绑定信息；" +
                                                     $"⚠️请确保在迁移之前在新群内使用一次\"刷新群信息\"命令\n",
-                                                     new List<string> { msg.WXID },
-                                                     msg.Self,
-                                                     msg.Sender);
-                        _context.CommunicateM.RegistWaitMessageRequest(msg.Self, msg.Sender, msg.WXID,
-                                                                       onReceivedCallback: new Func<Message, Task>((_msg) =>
+                                                    new List<string> { msg.Sender }, msg.RoomID);
+                        _context.CommunicateM.RegistWaitMessageRequest(msg.RoomID, msg.Sender,
+                                                                       onReceivedCallback: new Action<Message>((_msg) =>
                                                                           {
-                                                                              return Task.Run(() =>
+                                                                              if (_msg.Content != "确定") return;
+                                                                              var result = false;
+                                                                              try
                                                                               {
-                                                                                  if (_msg.Content != "确定") return;
-                                                                                  var result = false;
-                                                                                  try
-                                                                                  {
-                                                                                      result = _context.ContactsM.MoveBindGroup(msg.Self, oriGroup.WXID, group.WXID, rid);
-                                                                                  }
-                                                                                  catch (Exception ex)
-                                                                                  {
-                                                                                      Context.Logger.Write(ex, _moveGroupTag);
-                                                                                  }
-                                                                                  if (result) _context.WechatM.SendAtText($"俱乐部绑定迁移完成。\n" +
-                                                                                                                          $"当前微信群已经成功与俱乐部俱乐部[{club?.Name ?? "新俱乐部"}-{rid}]绑定。\n" +
-                                                                                                                          $"原微信群[{oriGroup.Name}]中的所有绑定信息已被清空。\n" +
-                                                                                                                          $"你可以发送\"查看俱乐部\"或\"查询微信群总览\"查看详情。",
-                                                                                                                          new List<string> { msg.WXID },
-                                                                                                                          msg.Self,
-                                                                                                                          msg.Sender);
-                                                                                  else _context.WechatM.SendAtText("因未知原因，操作失败了。",
-                                                                                                                   new List<string> { msg.WXID },
-                                                                                                                   msg.Self,
-                                                                                                                   msg.Sender);
-                                                                              });
+                                                                                  result = _context.ContactsM.MoveBindGroup(oriGroup.WXID, group.WXID, rid);
+                                                                              }
+                                                                              catch (Exception ex)
+                                                                              {
+                                                                                  Context.Logger.WriteException(ex, _moveGroupTag);
+                                                                              }
+                                                                              if (result) _context.WechatM.SendAtText($"俱乐部绑定迁移完成。\n" +
+                                                                                                                      $"当前微信群已经成功与俱乐部俱乐部[{club?.Name ?? "新俱乐部"}-{rid}]绑定。\n" +
+                                                                                                                      $"原微信群[{oriGroup.Name}]中的所有绑定信息已被清空。\n" +
+                                                                                                                      $"你可以发送\"查看俱乐部\"或\"查询微信群总览\"查看详情。",
+                                                                                                                      new List<string> { msg.Sender }, msg.RoomID);
+                                                                              else _context.WechatM.SendAtText("因未知原因，操作失败了。", new List<string> { msg.Sender }, msg.RoomID);
                                                                           }),
                                                                       verifier: new Func<Message, bool>((_msg) =>
                                                                       {
@@ -146,41 +127,32 @@ namespace RS.Snail.JJJ.robot.cmd.wechat
                 {
                     if (curRID == rid)
                     {
-                        _context.WechatM.SendAtText($"当前微信群已经与俱乐部[{club?.Name ?? "新俱乐部"}-{rid}]绑定，无需重复操作。\n",
-                                                     new List<string> { msg.WXID },
-                                                     msg.Self,
-                                                     msg.Sender);
+                        _context.WechatM.SendAtText($"当前微信群已经与俱乐部[{club?.Name ?? "新俱乐部"}-{rid}]绑定，无需重复操作。\n", new List<string> { msg.Sender }, msg.RoomID);
                         return;
                     }
                     // 当前群已经与其他俱乐部绑定
                     else
                     {
-                        var curClub = _context.ClubsM.FindClub(msg.Self, curRID);
+                        var curClub = _context.ClubsM.FindClub(curRID);
                         _context.WechatM.SendAtText($"当前微信群已经与其他俱乐部[{curClub?.Name ?? "新俱乐部"}-{curRID}]绑定。\n" +
-                                                   $"⚠️你必须先将原俱乐部的绑定转移到其他群，或者撤销原俱乐部的绑定，之后才能继续操作！\n" +
-                                                   $"⚠️若要转移原来的俱乐部，请通知该会长在其他群使用\"绑定群 {curRID}\"命令",
-                                                     new List<string> { msg.WXID },
-                                                     msg.Self,
-                                                     msg.Sender);
+                                                    $"⚠️你必须先将原俱乐部的绑定转移到其他群，或者撤销原俱乐部的绑定，之后才能继续操作！\n" +
+                                                    $"⚠️若要转移原来的俱乐部，请通知该会长在其他群使用\"绑定群 {curRID}\"命令",
+                                                    new List<string> { msg.Sender }, msg.RoomID);
                         return;
                     }
                 }
 
-                var result = _context.ContactsM.BindGroup(msg.Self, msg.Sender, rid);
+                var result = _context.ContactsM.BindGroup(msg.RoomID, rid);
                 if (result) _context.WechatM.SendAtText($"当前微信群已经成功与俱乐部俱乐部[{club?.Name ?? "新俱乐部"}-{rid}]绑定。\n" +
-                                                       $"现在您可以继续进行[设置经理]和[设置成员]操作。",
-                                                       new List<string> { msg.WXID },
-                                                       msg.Self,
-                                                       msg.Sender);
+                                                        $"现在您可以继续进行[设置经理]和[设置成员]操作。",
+                                                        new List<string> { msg.Sender }, msg.RoomID);
                 else _context.WechatM.SendAtText("⚠️因未知原因，操作失败了。",
-                                                new List<string> { msg.WXID },
-                                                msg.Self,
-                                                msg.Sender);
+                                                 new List<string> { msg.Sender }, msg.RoomID);
 
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, Tag);
+                Context.Logger.WriteException(ex, Tag);
             }
         }
     }

@@ -47,7 +47,7 @@ namespace RS.Snail.JJJ.boot
                     }
                     catch (Exception e)
                     {
-                        Logger.Instance.Write(e, "MappingMethods");
+                        Logger.Instance.WriteException(e, "MappingMethods");
                     }
                 }
             }
@@ -110,7 +110,7 @@ namespace RS.Snail.JJJ.boot
             }
             catch (Exception e)
             {
-                Logger.Instance.Write(e, "Command: cannot create instance with error:");
+                Logger.Instance.WriteException(e, "Command: cannot create instance with error:");
                 return false;
             }
 

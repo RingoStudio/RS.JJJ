@@ -1,6 +1,7 @@
 ﻿using Aliyun.OSS.Util;
 using Org.BouncyCastle.Utilities;
 using RS.Snail.JJJ.boot;
+using RS.Tools.Common.extension;
 using RS.Tools.Common.Utils;
 using System;
 using System.Collections.Concurrent;
@@ -50,16 +51,26 @@ namespace RS.Snail.JJJ.robot.modules
         /// <param name="times">时间点列表，格式“周几-小时-分钟-秒”</param>
         /// <param name="action">任务方法</param>
         /// <param name="isAutoLogin">是否是自动登录</param>
+        public void RegistSession(string tag, List<string> times, Action<string> action, bool isAutoLogin)
+        {
+            _sessions.Add(new ScheduleSession(tag, times, 0, action, isAutoLogin, include.ScheduleType.WEEK));
+        }
         public void RegistSession(string tag, List<string> times, Action action, bool isAutoLogin)
         {
             _sessions.Add(new ScheduleSession(tag, times, 0, action, isAutoLogin, include.ScheduleType.WEEK));
         }
-
-        public void RegistSession(string tag, long intreval, Action action, bool isAutoLogin)
+        public void RegistSession(string tag, long interval, Action action, bool isAutoLogin)
         {
             lock (_lock)
             {
-                _sessions.Add(new ScheduleSession(tag, null, intreval, action, isAutoLogin, include.ScheduleType.INTERVAL));
+                _sessions.Add(new ScheduleSession(tag, null, interval, action, isAutoLogin, include.ScheduleType.INTERVAL));
+            }
+        }
+        public void RegistSession(string tag, long interval, Action<string> action, bool isAutoLogin)
+        {
+            lock (_lock)
+            {
+                _sessions.Add(new ScheduleSession(tag, null, interval, action, isAutoLogin, include.ScheduleType.INTERVAL));
             }
         }
 
@@ -100,12 +111,21 @@ namespace RS.Snail.JJJ.robot.modules
         {
             lock (_lock)
             {
-                if (_sessions.Count == 0) return;
-
-                var now = TimeHelper.ToTimeStamp();
-                foreach (var session in _sessions.ToList())
+                try
                 {
-                    if (session.CanExecute(now)) session.Execute();
+                    if (_sessions.Count == 0) return;
+
+                    var now = TimeHelper.ToTimeStamp();
+                    foreach (var session in _sessions.ToList())
+                    {
+                        var check = session.CanExecute(now);
+                        if (check.result) session.Execute(check.arg);
+
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Context.Logger.WriteException(ex, "ScheduleM.Execute");
                 }
             }
         }
@@ -117,7 +137,7 @@ namespace RS.Snail.JJJ.robot.modules
             /// <summary>
             /// 时间节点（周期为一周）
             /// </summary>
-            public List<(int weekday, int hour, int min, int sec)> TimeStones { get; set; }
+            public List<string> TimeStones { get; set; }
             /// <summary>
             /// 上一次执行时间
             /// </summary>
@@ -125,7 +145,8 @@ namespace RS.Snail.JJJ.robot.modules
             /// <summary>
             /// 要执行的任务
             /// </summary>
-            public Action Session { get; set; }
+            public Action<string> Session { get; set; }
+            public Action Session2 { get; set; }
             /// <summary>
             /// 是否是登录任务
             /// </summary>
@@ -140,11 +161,21 @@ namespace RS.Snail.JJJ.robot.modules
             /// <param name="time"></param>
             /// <param name="action"></param>
             /// <param name="isAutoLogin"></param>
+            public ScheduleSession(string tag, List<string> time, long interval, Action<string> action, bool isAutoLogin, include.ScheduleType scheduleType)
+            {
+                Tag = tag;
+                TimeStones = time is null ? new List<string>() : time.DeepCopy();
+                this.Session = action;
+                this.LastTime = TimeHelper.ToTimeStamp();
+                this.isAutoLogin = isAutoLogin;
+                ScheduleType = scheduleType;
+                Interval = interval;
+            }
             public ScheduleSession(string tag, List<string> time, long interval, Action action, bool isAutoLogin, include.ScheduleType scheduleType)
             {
                 Tag = tag;
-                TimeStones = time is null ? new List<(int weekday, int hour, int min, int sec)>() : time.Select((a) => ConvertTimeStr(a)).ToList();
-                this.Session = action;
+                TimeStones = time is null ? new List<string>() : time.DeepCopy();
+                this.Session2 = action;
                 this.LastTime = TimeHelper.ToTimeStamp();
                 this.isAutoLogin = isAutoLogin;
                 ScheduleType = scheduleType;
@@ -154,36 +185,40 @@ namespace RS.Snail.JJJ.robot.modules
             /// <summary>
             /// 开辟新进程并执行任务
             /// </summary>
-            public void Execute()
+            public void Execute(string tag)
             {
                 LastTime = TimeHelper.ToTimeStamp();
-                Task.Run(Session);
+                Task.Run(() =>
+                {
+                    if (Session is not null) Session(tag);
+                    if (Session2 is not null) Session2();
+                });
             }
 
             /// <summary>
             /// 是否可以执行该任务
             /// </summary>
-            public bool CanExecute(long now = -1)
+            public (bool result, string arg) CanExecute(long now = -1)
             {
                 now = now <= 0 ? TimeHelper.ToTimeStamp() : now;
 
                 if (ScheduleType == include.ScheduleType.WEEK)
                 {
                     // lastTime 超过现在的时间或之前30秒，不可执行
-                    if (LastTime >= now - 30) return false;
+                    if (LastTime >= now - 30) return (false, "");
 
-                    foreach (var time in TimeStones.Select((a) => ConvertTimeStamp(a)))
+                    foreach (var time in TimeStones)
                     {
-                        if (Math.Abs(time - now) <= 10) return true;
+                        if (Math.Abs(ConvertTimeStamp(time) - now) <= 10) return (true, time);
                     }
                 }
                 else if (ScheduleType == include.ScheduleType.INTERVAL)
                 {
-                    if (LastTime >= now - Interval) return false;
-                    return true;
+                    if (LastTime >= now - Interval) return (false, "");
+                    return (true, "");
                 }
 
-                return false;
+                return (false, "");
             }
 
             public bool CheckTimeClose(bool justCheckLogin = false, long now = -1, long interval = 60)
@@ -212,7 +247,7 @@ namespace RS.Snail.JJJ.robot.modules
                 }
                 return (weekday, hour, min, sec);
             }
-
+            private long ConvertTimeStamp(string time, long now = -1) => ConvertTimeStamp(ConvertTimeStr(time), now);
             private long ConvertTimeStamp((int weekday, int hour, int min, int sec) time, long now = -1)
             {
                 if (now <= 0) now = TimeHelper.ToTimeStamp();

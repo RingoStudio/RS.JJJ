@@ -27,29 +27,22 @@ namespace RS.Snail.JJJ.robot.cmd.system
         public ChatScene EnableScene => ChatScene.All;
         public UserRole MinRole => UserRole.ADMINISTRATOR;
         public WechatMessageType AcceptMessageType => WechatMessageType.Text;
-        async public Task Do(Message msg)
+        public void Do(Message msg)
         {
-            await Task.Run(() =>
-             {
-                 try
-                 {
-                     var arr = msg.ExplodeContent;
-                     var interval = 60;
-                     if (arr.Length > 1 && StringHelper.IsInt(arr[1])) interval = Convert.ToInt32(arr[1]);
-                     interval = Math.Max(30, interval);
+            try
+            {
+                var arr = msg.ExplodeContent;
+                var interval = 60;
+                if (arr.Length > 1 && StringHelper.IsInt(arr[1])) interval = Convert.ToInt32(arr[1]);
+                interval = Math.Max(30, interval);
 
-                     _context.Restart(interval);
-                 }
-                 catch (Exception ex)
-                 {
-                     Context.Logger.Write(ex, Tag);
-                     _context.WechatM.SendAtText("⚠️因未知原因，操作失败了。",
-                                                 new List<string> { msg.WXID },
-                                                 msg.Self,
-                                                 msg.Sender);
-                 }
-             });
-
+                _context.Restart(interval);
+            }
+            catch (Exception ex)
+            {
+                Context.Logger.WriteException(ex, Tag);
+                _context.WechatM.SendAtText("⚠️因未知原因，操作失败了。", new List<string> { msg.Sender }, msg.RoomID);
+            }
         }
     }
 }

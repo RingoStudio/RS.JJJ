@@ -30,31 +30,21 @@ namespace RS.Snail.JJJ.robot.cmd.system
         public WechatMessageType AcceptMessageType => WechatMessageType.Text;
 
         [SupportedOSPlatform("windows")]
-        async public Task Do(Message msg)
+        public void Do(Message msg)
         {
-
-            await Task.Run(() =>
-               {
-                   try
-                   {
-                       var desc = JJJ.utils.SystemInfoHelper.GetSystemInfo();
-                       _context.WechatM.SendAtText($"———— 系统信息 ————\n" +
-                                                   desc +
-                                                   $"\n{TimeHelper.ChinsesTimeDesc(TimeHelper.ToTimeStamp())}",
-                                                   new List<string> { msg.WXID },
-                                                   msg.Self,
-                                                   msg.Sender);
-                   }
-                   catch (Exception ex)
-                   {
-                       Context.Logger.Write(ex, Tag);
-                       _context.WechatM.SendAtText("⚠️因未知原因，操作失败了。",
-                                                   new List<string> { msg.WXID },
-                                                   msg.Self,
-                                                   msg.Sender);
-                   }
-               });
-
+            try
+            {
+                var desc = JJJ.utils.SystemInfoHelper.GetSystemInfo();
+                _context.WechatM.SendAtText($"\n———— 系统信息 ————\n" +
+                                            desc +
+                                            $"\n{TimeHelper.ChinsesTimeDesc(TimeHelper.ToTimeStamp())}",
+                                           new List<string> { msg.Sender }, msg.RoomID);
+            }
+            catch (Exception ex)
+            {
+                Context.Logger.WriteException(ex, Tag);
+                _context.WechatM.SendAtText("⚠️因未知原因，操作失败了。", new List<string> { msg.Sender }, msg.RoomID);
+            }
         }
     }
 }

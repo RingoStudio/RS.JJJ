@@ -27,31 +27,25 @@ namespace RS.Snail.JJJ.robot.cmd.club
         public UserRole MinRole => UserRole.ADMINISTRATOR;
         public WechatMessageType AcceptMessageType => WechatMessageType.Text;
 
-        async public Task Do(Message msg)
+        public void Do(Message msg)
         {
             try
             {
-                var result = await Task.Run(() => _context.ClubsM.GetClubListExcel(msg.Self));
+                var result = _context.ClubsM.GetClubListExcel();
                 if (string.IsNullOrEmpty(result) || !System.IO.File.Exists(result))
                 {
-                    _context.WechatM.SendAtText("⚠️因未知原因，操作失败了。",
-                                            new List<string> { msg.WXID },
-                                            msg.Self,
-                                            msg.Sender);
+                    _context.WechatM.SendAtText("⚠️因未知原因，操作失败了。", new List<string> { msg.Sender }, msg.RoomID);
                 }
                 else
                 {
-                    _context.WechatM.SendFile(result, msg.Self, msg.Sender);
+                    _context.WechatM.SendFile(result, msg.RoomID);
 
                 }
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, Tag);
-                _context.WechatM.SendAtText("⚠️因未知原因，操作失败了。",
-                                                new List<string> { msg.WXID },
-                                                msg.Self,
-                                                msg.Sender);
+                Context.Logger.WriteException(ex, Tag);
+                _context.WechatM.SendAtText("⚠️因未知原因，操作失败了。", new List<string> { msg.Sender }, msg.RoomID);
             }
         }
     }

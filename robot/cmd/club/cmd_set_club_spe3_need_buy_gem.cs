@@ -27,7 +27,7 @@ namespace RS.Snail.JJJ.robot.cmd.club
         public ChatScene EnableScene => ChatScene.All;
         public UserRole MinRole => UserRole.GROUP_MANAGER;
         public WechatMessageType AcceptMessageType => WechatMessageType.Text;
-        async public Task Do(Message msg)
+        public void Do(Message msg)
         {
             try
             {
@@ -37,7 +37,7 @@ namespace RS.Snail.JJJ.robot.cmd.club
                 var mode = 0;
                 if (arr.Length > 1)
                 {
-                    for (int i = 1; i <= arr.Length; i++)
+                    for (int i = 1; i < arr.Length; i++)
                     {
                         if (StringHelper.IsRID(arr[i])) rid = arr[i];
                         if (arr[i] == "开" || arr[i] == "开启" || arr[i].ToLower() == "on" || arr[i].ToLower() == "是" || arr[i].ToLower() == "需要") mode = 1;
@@ -53,13 +53,10 @@ namespace RS.Snail.JJJ.robot.cmd.club
                     if (msg.Scene == ChatScene.Private) return;
                     else
                     {
-                        var group = _context.ContactsM.FindGroup(msg.Self, msg.Sender);
+                        var group = _context.ContactsM.FindGroup(msg.RoomID);
                         if (group is null)
                         {
-                            _context.WechatM.SendAtText($"⚠️唧唧叽缺少当前微信群的资料，请联系超管使用命令\"刷新群信息\"。",
-                                                        new List<string> { msg.WXID },
-                                                        msg.Self,
-                                                        msg.Sender);
+                            _context.WechatM.SendAtText($"⚠️唧唧叽缺少当前微信群的资料，请联系超管使用命令\"刷新群信息\"。", new List<string> { msg.Sender }, msg.RoomID);
                             return;
                         }
                         rid = group.RID;
@@ -69,23 +66,17 @@ namespace RS.Snail.JJJ.robot.cmd.club
                 if (string.IsNullOrEmpty(rid)) return;
 
                 // 检查本俱乐部权限
-                if (!_context.ContactsM.CheckGroupRole(msg.Self, rid, msg.WXID, msg.Scene == ChatScene.Group ? msg.Sender : ""))
+                if (_context.ContactsM.QueryRole(msg.Sender, rid: rid) < MinRole)
                 {
-                    _context.WechatM.SendAtText($"不可以查看其他俱乐部的信息。",
-                                             new List<string> { msg.WXID },
-                                             msg.Self,
-                                             msg.Sender);
+                    _context.WechatM.SendAtText($"您没有查看该俱乐部相关信息的权限。", new List<string> { msg.Sender }, msg.RoomID);
                     return;
                 }
 
                 // 找到俱乐部
-                var club = _context.ClubsM.FindClub(msg.Self, rid);
+                var club = _context.ClubsM.FindClub(rid);
                 if (club is null)
                 {
-                    _context.WechatM.SendAtText($"⚠️要查询的俱乐部[{rid}]不存在。",
-                                                new List<string> { msg.WXID },
-                                                msg.Self,
-                                                msg.Sender);
+                    _context.WechatM.SendAtText($"⚠️要查询的俱乐部[{rid}]不存在。", new List<string> { msg.Sender }, msg.RoomID);
                     return;
                 }
 
@@ -93,16 +84,13 @@ namespace RS.Snail.JJJ.robot.cmd.club
 
                 club.Spe3DontNeedBuyGem = (mode < 0);
                 var desc = $"已将俱乐部[{club.Name}]的北极贝买卷轴设置为";
-                desc += (!club.Spe3DontNeedBuyGem) ? "[需要]\n该俱乐部未使用白蝌蚪购买卷轴的成员将不会被提醒" :
-                                               "[不需要]\n该俱乐部未使用白蝌蚪购买卷轴的成员将会被提醒";
-                _context.WechatM.SendAtText(desc,
-                                          new List<string> { msg.WXID },
-                                          msg.Self,
-                                          msg.Sender);
+                desc += (!club.Spe3DontNeedBuyGem) ? "[需要]\n该俱乐部未使用白蝌蚪购买卷轴的成员将会被提醒" :
+                                                     "[不需要]\n该俱乐部未使用白蝌蚪购买卷轴的成员将不会被提醒";
+                _context.WechatM.SendAtText(desc, new List<string> { msg.Sender }, msg.RoomID);
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, Tag);
+                Context.Logger.WriteException(ex, Tag);
             }
         }
     }

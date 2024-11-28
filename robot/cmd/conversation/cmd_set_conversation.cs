@@ -50,17 +50,17 @@ namespace RS.Snail.JJJ.robot.cmd.conversation
             _cache.TryRemove(_id, out _);
         }
 
-        async public Task Do(Message msg)
+        public void Do(Message msg)
         {
             try
             {
-                _context.CommunicateM.UnregistWaitMessageRequest(msg.Self, msg.Sender, msg.WXID, _continueTag);
+                _context.CommunicateM.UnregistWaitMessageRequest(msg.RoomID, msg.Sender, _continueTag);
                 // 更新对话 [OPT:RID] [KEY]
                 var rid = "";
                 var arr = msg.ExplodeContent;
                 var key = "";
-                if (arr.Length < 3) return;
-                for (int i = 1; i <= arr.Length; i++)
+                if (arr.Length < 2) return;
+                for (int i = 1; i < arr.Length; i++)
                 {
                     if (StringHelper.IsRID(arr[i]) && string.IsNullOrEmpty(rid)) rid = arr[i];
                     else if (string.IsNullOrEmpty(key)) key = arr[i];
@@ -72,13 +72,10 @@ namespace RS.Snail.JJJ.robot.cmd.conversation
                     if (msg.Scene == ChatScene.Private) return;
                     else
                     {
-                        var group = _context.ContactsM.FindGroup(msg.Self, msg.Sender);
+                        var group = _context.ContactsM.FindGroup(msg.RoomID);
                         if (group is null)
                         {
-                            _context.WechatM.SendAtText($"⚠️唧唧叽缺少当前微信群的资料，请联系超管使用命令\"刷新群信息\"。",
-                                                        new List<string> { msg.WXID },
-                                                        msg.Self,
-                                                        msg.Sender);
+                            _context.WechatM.SendAtText($"⚠️唧唧叽缺少当前微信群的资料，请联系超管使用命令\"刷新群信息\"。", new List<string> { msg.Sender }, msg.RoomID);
                             return;
                         }
                         rid = group.RID;
@@ -87,23 +84,17 @@ namespace RS.Snail.JJJ.robot.cmd.conversation
                 if (string.IsNullOrEmpty(rid)) return;
 
                 // 检查本俱乐部权限
-                if (!_context.ContactsM.CheckGroupRole(msg.Self, rid, msg.WXID, msg.Scene == ChatScene.Group ? msg.Sender : ""))
+                if (_context.ContactsM.QueryRole(msg.Sender, rid: rid) < MinRole)
                 {
-                    _context.WechatM.SendAtText($"不可以设置其他俱乐部的对话。",
-                                             new List<string> { msg.WXID },
-                                             msg.Self,
-                                             msg.Sender);
+                    _context.WechatM.SendAtText($"不可以设置其他俱乐部的对话。", new List<string> { msg.Sender }, msg.RoomID);
                     return;
                 }
 
                 // 找到俱乐部
-                var club = _context.ClubsM.FindClub(msg.Self, rid);
+                var club = _context.ClubsM.FindClub(rid);
                 if (club is null)
                 {
-                    _context.WechatM.SendAtText($"⚠️要查询的俱乐部[{rid}]不存在。",
-                                                new List<string> { msg.WXID },
-                                                msg.Self,
-                                                msg.Sender);
+                    _context.WechatM.SendAtText($"⚠️要查询的俱乐部[{rid}]不存在。", new List<string> { msg.Sender }, msg.RoomID);
                     return;
                 }
 
@@ -114,10 +105,7 @@ namespace RS.Snail.JJJ.robot.cmd.conversation
                 if (string.IsNullOrEmpty(key))
                 {
                     var tip = new List<string>();
-                    _context.WechatM.SendAtText($"在设置对话内容时，您输入了空的关键字，设置失败。",
-                                                 new List<string> { msg.WXID },
-                                                 msg.Self,
-                                                 msg.Sender);
+                    _context.WechatM.SendAtText($"在设置对话内容时，您输入了空的关键字，设置失败。", new List<string> { msg.Sender }, msg.RoomID);
                     return;
                 }
 
@@ -125,26 +113,20 @@ namespace RS.Snail.JJJ.robot.cmd.conversation
                 var conversation = _context.ConversationM.CheckConversationKey(rid, key);
 
                 if (conversation == 2) _context.WechatM.SendAtText($"关键词[{key}]已存在于公共对话中，您目前不可以使用这个关键词。\n" +
-                                                                $"添加对话失败！",
-                                                                new List<string> { msg.WXID },
-                                                                msg.Self,
-                                                                msg.Sender);
+                                                                   $"添加对话失败！",
+                                                                   new List<string> { msg.Sender }, msg.RoomID);
                 else
                 {
                     if (conversation == 1) _context.WechatM.SendAtText($"关键词[{key}]已存在于该俱乐部的对话中，继续添加对话会覆盖原有内容。\n" +
                                                                       $"可接受的回复内容包括：文本(300字以内)，图片(格式为.png/.jpg等)，文档(格式为.docx/.xlsx/.pptx/.pdf等)，图片及文档共最多3个\n" +
                                                                       $"若回复内容满足以上要求，将被直接保存\n" +
                                                                       $"请在20秒之内发出，或回复\"取消\"",
-                                                                      new List<string> { msg.WXID },
-                                                                      msg.Self,
-                                                                      msg.Sender);
+                                                                      new List<string> { msg.Sender }, msg.RoomID);
                     else _context.WechatM.SendAtText($"现在请你为关键字[{key}]指定要回复的内容。\n" +
                                                      $"可接受的回复内容包括：文本(300字以内)，图片(格式为.png/.jpg等)，文档(格式为.docx/.xlsx/.pptx/.pdf等)，图片及文档共最多3个\n" +
                                                      $"若回复内容满足以上要求，将被直接保存\n" +
                                                      $"请在20秒之内发出，或回复\"取消\"",
-                                                      new List<string> { msg.WXID },
-                                                      msg.Self,
-                                                      msg.Sender);
+                                                     new List<string> { msg.Sender }, msg.RoomID);
 
                     var bc = new BroadCast(msg)
                     {
@@ -159,10 +141,10 @@ namespace RS.Snail.JJJ.robot.cmd.conversation
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, Tag);
+                Context.Logger.WriteException(ex, Tag);
             }
         }
-        private async Task OnMessageArrival(Message msg)
+        private void OnMessageArrival(Message msg)
         {
             try
             {
@@ -191,9 +173,7 @@ namespace RS.Snail.JJJ.robot.cmd.conversation
                                                         AttackDesc(bc.ContentLength, bc.AttachCount) +
                                                         "请发送\"取消\"终止操作。\n" +
                                                         "以上操作20秒内有效。",
-                                                        new List<string> { msg.WXID },
-                                                        msg.Self,
-                                                        msg.Sender);
+                                                        new List<string> { msg.Sender }, msg.RoomID);
                             Loops(msg);
                         }
                         else
@@ -204,9 +184,7 @@ namespace RS.Snail.JJJ.robot.cmd.conversation
                                                         AttackDesc(bc.ContentLength, bc.AttachCount) +
                                                         "请发送\"取消\"终止操作。\n" +
                                                         "以上操作20秒内有效。",
-                                                        new List<string> { msg.WXID },
-                                                        msg.Self,
-                                                        msg.Sender);
+                                                        new List<string> { msg.Sender }, msg.RoomID);
                             Loops(msg);
                         }
                     }
@@ -220,9 +198,7 @@ namespace RS.Snail.JJJ.robot.cmd.conversation
                                                    AttackDesc(bc.ContentLength, bc.AttachCount) +
                                                    "请发送\"取消\"终止操作。\n" +
                                                    "以上操作20秒内有效。",
-                                                   new List<string> { msg.WXID },
-                                                   msg.Self,
-                                                   msg.Sender);
+                                                   new List<string> { msg.Sender }, msg.RoomID);
                         Loops(msg);
                     }
                     else
@@ -235,9 +211,7 @@ namespace RS.Snail.JJJ.robot.cmd.conversation
                                                         AttackDesc(bc.ContentLength, bc.AttachCount) +
                                                         "请发送\"取消\"终止操作。\n" +
                                                         "以上操作20秒内有效。",
-                                                        new List<string> { msg.WXID },
-                                                        msg.Self,
-                                                        msg.Sender); ;
+                                                        new List<string> { msg.Sender }, msg.RoomID);
                             Loops(msg);
                         }
                         else if (bc.Files.Contains(path))
@@ -247,9 +221,7 @@ namespace RS.Snail.JJJ.robot.cmd.conversation
                                                         AttackDesc(bc.ContentLength, bc.AttachCount) +
                                                         "请发送\"取消\"终止操作。\n" +
                                                         "以上操作20秒内有效。",
-                                                        new List<string> { msg.WXID },
-                                                        msg.Self,
-                                                        msg.Sender);
+                                                        new List<string> { msg.Sender }, msg.RoomID);
                             Loops(msg);
                         }
                         else
@@ -260,9 +232,7 @@ namespace RS.Snail.JJJ.robot.cmd.conversation
                                                         AttackDesc(bc.ContentLength, bc.AttachCount) +
                                                         "请发送\"取消\"终止操作。\n" +
                                                         "以上操作20秒内有效。",
-                                                        new List<string> { msg.WXID },
-                                                        msg.Self,
-                                                        msg.Sender);
+                                                        new List<string> { msg.Sender }, msg.RoomID);
                             Loops(msg);
                         }
                     }
@@ -278,45 +248,36 @@ namespace RS.Snail.JJJ.robot.cmd.conversation
                                                     AttackDesc(bc.ContentLength, bc.AttachCount) +
                                                     "请发送\"取消\"终止操作。\n" +
                                                     "以上操作20秒内有效。",
-                                                    new List<string> { msg.WXID },
-                                                    msg.Self,
-                                                    msg.Sender);
+                                                    new List<string> { msg.Sender }, msg.RoomID);
                         Loops(msg);
                     }
                     else if (bc.Images.Contains(path))
                     {
                         _context.WechatM.SendAtText($"你发送了重复的图片，请重新发送。\n" +
-                                              "请发送\"确定\"完成并保存对话。\n" +
-                                              AttackDesc(bc.ContentLength, bc.AttachCount) +
-                                              "请发送\"取消\"终止操作。\n" +
-                                              "以上操作20秒内有效。",
-                                              new List<string> { msg.WXID },
-                                              msg.Self,
-                                              msg.Sender);
+                                                    "请发送\"确定\"完成并保存对话。\n" +
+                                                    AttackDesc(bc.ContentLength, bc.AttachCount) +
+                                                    "请发送\"取消\"终止操作。\n" +
+                                                    "以上操作20秒内有效。",
+                                                    new List<string> { msg.Sender }, msg.RoomID);
                         Loops(msg);
                     }
                     else
                     {
                         bc.Images.Add(path);
                         _context.WechatM.SendAtText($"成功接收图片。\n" +
-                                                      "请发送\"确定\"完成并保存对话。\n" +
-                                                      AttackDesc(bc.ContentLength, bc.AttachCount) +
-                                                      "请发送\"取消\"终止操作。\n" +
-                                                      "以上操作20秒内有效。",
-                                                      new List<string> { msg.WXID },
-                                                      msg.Self,
-                                                      msg.Sender);
+                                                    "请发送\"确定\"完成并保存对话。\n" +
+                                                    AttackDesc(bc.ContentLength, bc.AttachCount) +
+                                                    "请发送\"取消\"终止操作。\n" +
+                                                    "以上操作20秒内有效。",
+                                                    new List<string> { msg.Sender }, msg.RoomID);
                         Loops(msg);
                     }
                 }
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, _continueTag);
-                _context.WechatM.SendAtText("因未知原因，操作失败了，具体原因见日志。",
-                                       new List<string> { msg.WXID },
-                msg.Self,
-                msg.Sender);
+                Context.Logger.WriteException(ex, _continueTag);
+                _context.WechatM.SendAtText("因未知原因，操作失败了，具体原因见日志。", new List<string> { msg.Sender }, msg.RoomID);
             }
         }
         private void Loops(Message msg)
@@ -324,24 +285,21 @@ namespace RS.Snail.JJJ.robot.cmd.conversation
 
             try
             {
-                _context.CommunicateM.RegistWaitMessageRequest(msg.Self, msg.Sender, msg.WXID,
-                                                                 onReceivedCallback: OnMessageArrival,
-                                                                 verifier: null,
-                                                                 onTimeout: new Action(() =>
-                                                                 {
-                                                                     RemoveCache(msg);
-                                                                 }),
-                                                                 acceptTypes: null,
-                                                                 waitSeconds: 20,
-                                                                 tag: _continueTag);
+                _context.CommunicateM.RegistWaitMessageRequest(msg.RoomID, msg.Sender,
+                                                               onReceivedCallback: OnMessageArrival,
+                                                               verifier: null,
+                                                               onTimeout: new Action(() =>
+                                                               {
+                                                                   RemoveCache(msg);
+                                                               }),
+                                                               acceptTypes: null,
+                                                               waitSeconds: 20,
+                                                               tag: _continueTag);
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, Tag);
-                _context.WechatM.SendAtText("因未知原因，操作失败了，具体原因见日志。",
-                                            new List<string> { msg.WXID },
-                                            msg.Self,
-                                            msg.Sender);
+                Context.Logger.WriteException(ex, Tag);
+                _context.WechatM.SendAtText("因未知原因，操作失败了，具体原因见日志。", new List<string> { msg.Sender }, msg.RoomID);
             }
         }
 
@@ -361,28 +319,19 @@ namespace RS.Snail.JJJ.robot.cmd.conversation
                 var result = _context.ConversationM.UpdateGroupConversation(rid, key, txt, images, files);
                 if (result)
                 {
-                    var desc = $"俱乐部[{_context.ClubsM.QueryClubName(msg.Self, rid) ?? rid}]已经更新了新的对话内容\n" +
+                    var desc = $"俱乐部[{_context.ClubsM.QueryClubName(rid) ?? rid}]已经更新了新的对话内容\n" +
                                $"关键字：{key}";
                     if (!string.IsNullOrEmpty(txt)) desc += $"\n文本：{txt.Length}字";
                     if (images.Count > 0) desc += $"\n图片：{images.Count}个";
                     if (files.Count > 0) desc += $"\n文档：{files.Count}个";
-                    _context.WechatM.SendAtText(desc,
-                                               new List<string> { msg.WXID },
-                                               msg.Self,
-                                               msg.Sender);
+                    _context.WechatM.SendAtText(desc, new List<string> { msg.Sender }, msg.RoomID);
                 }
-                else _context.WechatM.SendAtText("因未知原因，操作失败了，具体原因见日志。",
-                                                new List<string> { msg.WXID },
-                                                msg.Self,
-                                                msg.Sender);
+                else _context.WechatM.SendAtText("因未知原因，操作失败了，具体原因见日志。", new List<string> { msg.Sender }, msg.RoomID);
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, Tag);
-                _context.WechatM.SendAtText("因未知原因，操作失败了，具体原因见日志。",
-                                            new List<string> { msg.WXID },
-                                            msg.Self,
-                                            msg.Sender);
+                Context.Logger.WriteException(ex, Tag);
+                _context.WechatM.SendAtText("因未知原因，操作失败了，具体原因见日志。", new List<string> { msg.Sender }, msg.RoomID);
             }
         }
     }

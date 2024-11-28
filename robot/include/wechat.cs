@@ -28,11 +28,12 @@ namespace RS.Snail.JJJ.robot.include
         /// <summary>
         /// 机器人自身
         /// </summary>
-        BOT = 9999,
-        ADMINISTRATOR = 999,
-        GROUP_HOLDER = 99,
-        GROUP_MANAGER = 9,
-        NORMAL = 5,
+        BOT = 99999,
+        ADMINISTRATOR = 9999,
+        GROUP_HOLDER = 999,
+        GROUP_MANAGER = 99,
+        NORMAL = 50,
+        MAYDAY = 40,
         PLAYER = 1,
         NONE = 0,
         UNDEFINED = -1,

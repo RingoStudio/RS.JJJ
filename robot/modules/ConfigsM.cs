@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 namespace RS.Snail.JJJ.robot.modules
 {
     /// <summary>
-    /// 基础配置模块
+    /// 基础配置模组
     /// </summary>
     internal class ConfigsM : IModule
     {
@@ -49,38 +49,114 @@ namespace RS.Snail.JJJ.robot.modules
         #endregion
 
         #region GLOBAL SETTINGS
+
+        private bool _switchCommunicateClose = false;
         /// <summary>
         /// 关闭全局对话相应(除超管)
         /// </summary>
-        public bool SwitchCommunicateClose { get; set; }
+        public bool SwitchCommunicateClose
+        {
+            get => _switchCommunicateClose;
+            set
+            {
+                _switchCommunicateClose = value;
+                _commonConfigs.switch_communicate_close = _switchCommunicateClose;
+                SaveCSV();
+            }
+        }
+
+        private bool _switchLoginClose = false;
         /// <summary>
         /// 禁用启动登录
         /// </summary>
-        public bool SwitchLoginClose { get; set; }
+        public bool SwitchLoginClose
+        {
+            get => _switchLoginClose;
+            set
+            {
+                _switchLoginClose = value;
+                _commonConfigs.switch_login_close = _switchLoginClose;
+                SaveCSV();
+            }
+        }
+
+        private bool _switchHandbookClose = false;
         /// <summary>
         /// 禁用图鉴
         /// </summary>
-        public bool SwitchHandbookClose { get; set; }
+        public bool SwitchHandbookClose
+        {
+            get => _switchHandbookClose;
+            set
+            {
+                _switchHandbookClose = value;
+                _commonConfigs.switch_handbook_close = _switchHandbookClose;
+                SaveCSV();
+            }
+        }
+
+        private bool _switchCDKeyClose = false;
         /// <summary>
         /// 禁用密令
         /// </summary>
-        public bool SwitchCDKeyClose { get; set; }
+        public bool SwitchCDKeyClose
+        {
+            get => _switchCDKeyClose;
+            set
+            {
+                _switchCDKeyClose = value;
+                _commonConfigs.switch_cdkey_close = _switchCDKeyClose;
+                SaveCSV();
+            }
+        }
+
+        private bool _switchQianClose = false;
         /// <summary>
         /// 禁用抽签
         /// </summary>
-        public bool SwitchQianClose { get; set; }
+        public bool SwitchQianClose
+        {
+            get => _switchQianClose; set
+            {
+                _switchQianClose = value;
+                _commonConfigs.switch_qian_close = _switchQianClose;
+                SaveCSV();
+            }
+        }
+
+        private bool _switchConversationClose = false;
         /// <summary>
         /// 禁用对话
         /// </summary>
-        public bool SwitchConversationClose { get; set; }
+        public bool SwitchConversationClose
+        {
+            get => _switchConversationClose; set
+            {
+                _switchConversationClose = value;
+                _commonConfigs.switch_conversation_close = _switchConversationClose;
+                SaveCSV();
+            }
+        }
 
-
+        public int MaydayTicketCountPerday { get; private set; }
 
         /// <summary>
         /// 相同对话间隔
         /// </summary>
         public long CfgSameContentInterval { get; private set; }
+        /// <summary>
+        /// 俱乐部登录超时时间
+        /// </summary>
+        public long ClubLoginTimeoutInterval { get; private set; }
+        /// <summary>
+        /// 图鉴CD
+        /// </summary>
+        public long HandbookInterval { get; private set; }
 
+        /// <summary>
+        /// OUT文件夹文件过期时间
+        /// </summary>
+        public long OUTFilesTimeout { get; private set; }
         #endregion
 
         #region INIT
@@ -112,7 +188,7 @@ namespace RS.Snail.JJJ.robot.modules
                 }
                 catch (Exception ex)
                 {
-                    Context.Logger.Write(ex, $"ConfigsM.InitFolders {_folder}");
+                    Context.Logger.WriteException(ex, $"ConfigsM.InitFolders {_folder}");
                 }
 
             }
@@ -124,7 +200,33 @@ namespace RS.Snail.JJJ.robot.modules
             {
                 _commonConfigs = IOHelper.GetJO("BOT\\jjj_cfg.json", false) ?? new JObject();
                 CfgSameContentInterval = JSONHelper.ParseLong(_commonConfigs.same_content_cd_second);
+                MaydayTicketCountPerday = JSONHelper.ParseInt(_commonConfigs.mayday_ticket_count_perday);
+                _switchCommunicateClose = JSONHelper.ParseBool(_commonConfigs.switch_communicate_close);
+                _switchLoginClose = JSONHelper.ParseBool(_commonConfigs.switch_login_close);
+                _switchHandbookClose = JSONHelper.ParseBool(_commonConfigs.switch_handbook_close);
+                _switchCDKeyClose = JSONHelper.ParseBool(_commonConfigs.switch_cdkey_close);
+                _switchQianClose = JSONHelper.ParseBool(_commonConfigs.switch_qian_close);
+                _switchConversationClose = JSONHelper.ParseBool(_commonConfigs.switch_conversation_close);
+                ClubLoginTimeoutInterval = JSONHelper.ParseLong(_commonConfigs.login_timeout_interval);
+                if (ClubLoginTimeoutInterval <= 0) ClubLoginTimeoutInterval = 300;
+                HandbookInterval = JSONHelper.ParseLong(_commonConfigs.handbook_interval);
+                if (HandbookInterval <= 0) HandbookInterval = 30;
+                OUTFilesTimeout = JSONHelper.ParseLong(_commonConfigs.out_files_timeout);
+                if (OUTFilesTimeout <= 0) OUTFilesTimeout = 3 * 86400;
+
                 //  _clubConfigs = IOHelper.GetCSV(Tools.Common.Enums.CSVType.RobotData, include.files.Club_Configs) ?? new JObject();
+            }
+            catch (Exception ex)
+            {
+
+            }
+        }
+
+        private void SaveCSV()
+        {
+            try
+            {
+                IOHelper.SaveJO(_commonConfigs, "BOT\\jjj_cfg.json", false);
             }
             catch (Exception ex)
             {

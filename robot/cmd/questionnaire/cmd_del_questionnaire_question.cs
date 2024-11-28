@@ -29,11 +29,11 @@ namespace RS.Snail.JJJ.robot.cmd.questionnaire
 
         private static string _confirmTag = "cmd_set_questionnaire_question_confirm";
 
-        async public Task Do(Message msg)
+        public void Do(Message msg)
         {
             try
             {
-                _context.CommunicateM.UnregistWaitMessageRequest(msg.Self, msg.Sender, msg.WXID, _confirmTag);
+                _context.CommunicateM.UnregistWaitMessageRequest(msg.RoomID, msg.Sender, _confirmTag);
                 var arr = msg.ExplodeContent;
                 if (arr.Length < 2) return;
                 var question = arr[1];
@@ -44,44 +44,33 @@ namespace RS.Snail.JJJ.robot.cmd.questionnaire
                     _context.WechatM.SendAtText($"请确认是否删除问题[{question}]？\n" +
                                                 $"该问题目前已有{existCount}个回复\n" +
                                                 $"请在20秒内回复\"确定\"或\"取消\"",
-                                                new List<string> { msg.WXID },
-                                                msg.Self,
-                                                msg.Sender);
-                    _context.CommunicateM.RegistWaitMessageRequest(msg.Self, msg.Sender, msg.WXID,
-                                                                 onReceivedCallback: new Func<Message, Task>((_msg) =>
-                                                                 {
-                                                                     return Task.Run(() =>
-                                                                      {
-                                                                          if (_msg.Content == "确定")
-                                                                          {
-                                                                              _context.QuestionnaireM.DelQuestion(question);
-                                                                              _context.WechatM.SendAtText($"已删除调查问卷问题 [{question}]",
-                                                                                                          new List<string> { msg.WXID },
-                                                                                                          msg.Self,
-                                                                                                          msg.Sender);
-                                                                          }
-                                                                      });
-                                                                 }),
-                                                                 verifier: new Func<Message, bool>((_msg) =>
-                                                                 {
-                                                                     return _msg.Content == "确定" || _msg.Content == "取消";
-                                                                 }),
-                                                                 waitSeconds: 20,
-                                                                 tag: _confirmTag);
+                                                new List<string> { msg.Sender }, msg.RoomID);
+                    _context.CommunicateM.RegistWaitMessageRequest(msg.RoomID, msg.Sender,
+                                                                   onReceivedCallback: new Action<Message>((_msg) =>
+                                                                   {
+                                                                       if (_msg.Content == "确定")
+                                                                       {
+                                                                           _context.QuestionnaireM.DelQuestion(question);
+                                                                           _context.WechatM.SendAtText($"已删除调查问卷问题 [{question}]", new List<string> { msg.Sender }, msg.RoomID);
+                                                                       }
+                                                                   }),
+                                                                   verifier: new Func<Message, bool>((_msg) =>
+                                                                   {
+                                                                       return _msg.Content == "确定" || _msg.Content == "取消";
+                                                                   }),
+                                                                   waitSeconds: 20,
+                                                                   tag: _confirmTag);
                 }
                 else
                 {
-                    _context.WechatM.SendAtText($"问题 [{question}] 不存在。",
-                                                new List<string> { msg.WXID },
-                                                msg.Self,
-                                                msg.Sender);
+                    _context.WechatM.SendAtText($"问题 [{question}] 不存在。", new List<string> { msg.Sender }, msg.RoomID);
                 }
 
 
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, Tag);
+                Context.Logger.WriteException(ex, Tag);
             }
         }
     }

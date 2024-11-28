@@ -34,11 +34,11 @@ namespace RS.Snail.JJJ.robot.cmd.misc
         private static int _maxCount = 1;
         private static int _maxLength = 300;
         private ConcurrentDictionary<string, BroadCast> _broadCasts = new();
-        async public Task Do(Message msg)
+        public void Do(Message msg)
         {
             try
             {
-                _context.CommunicateM.UnregistWaitMessageRequest(msg.Self, msg.Sender, msg.WXID, _continueTag);
+                _context.CommunicateM.UnregistWaitMessageRequest(msg.RoomID, msg.Sender, _continueTag);
                 var arr = msg.ExplodeContent;
                 if (arr.Length < 2) return;
                 var instru = arr.First();
@@ -109,7 +109,7 @@ namespace RS.Snail.JJJ.robot.cmd.misc
             var _id = BroadCast.GetID(msg);
             _broadCasts.TryRemove(_id, out _);
         }
-        private async Task OnMessageArrival(Message msg)
+        private void OnMessageArrival(Message msg)
         {
             try
             {

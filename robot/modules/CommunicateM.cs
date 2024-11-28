@@ -4,6 +4,7 @@ using RS.Snail.JJJ.Client.core.res.communicate;
 using RS.Snail.JJJ.clone;
 using RS.Snail.JJJ.robot.cmd;
 using RS.Tools.Common.Utils;
+using RS.WechatFerry.model;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -22,12 +23,10 @@ namespace RS.Snail.JJJ.robot.modules
         private bool _inited = false;
         public bool Inited { get => _inited; }
 
-        private RS.Snail.JJJ.Wechat.Service _service;
-
         private Dictionary<string, ICMD> _cmds;
-        private ConcurrentDictionary<string, List<WaitMessageRequest>> _waitRequests;
-        private ConcurrentDictionary<string, ConcurrentQueue<Message>> _messageQueue;
-        private ConcurrentDictionary<string, bool> _isTreating;
+        private ConcurrentDictionary<string, WaitMessageRequest> _waitRequests;
+        private ConcurrentQueue<Message> _messageQueue;
+        private bool _isTreating;
         #endregion
 
         #region INIT
@@ -59,14 +58,12 @@ namespace RS.Snail.JJJ.robot.modules
             {
                 try
                 {
-                    ICMD? cmd = Activator.CreateInstance(type, this) as ICMD;
+                    ICMD? cmd = Activator.CreateInstance(type, _context) as ICMD;
                     if (cmd is null) continue;
+
                     var name = cmd.Tag;
 
-                    if (_cmds.ContainsKey(name))
-                    {
-                        continue;
-                    }
+                    if (_cmds.ContainsKey(name)) continue;
 
                     _cmds.TryAdd(name, cmd);
                 }
@@ -80,88 +77,85 @@ namespace RS.Snail.JJJ.robot.modules
         #endregion
 
         #region METHODS
-        public async Task ReceiveMessage(dynamic data)
+        public void ReceiveMessage(RecvMsg data)
         {
             try
             {
-                var message = new Message(data);
-                var robotWXID = message.Self;
-                if (!_messageQueue.ContainsKey(robotWXID)) _messageQueue.TryAdd(robotWXID, new ConcurrentQueue<Message>());
-                _messageQueue[robotWXID].Enqueue(message);
-                if (!GetTreatingStat(robotWXID)) await TreatMessages(robotWXID);
+                //if (data.Sender != "wxid_4rcudy2bjq3422" && !data.Content.Contains("所有人")) return;
+                //Console.WriteLine(data.GetDesc());
+                var message = new Message(data, _context.WechatM.SelfWXID());
+                _messageQueue.Enqueue(message);
+                if (!GetTreatingStat()) TreatMessages();
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, "CommunicateM.ReceiveMessage");
+                Context.Logger.WriteException(ex, "CommunicateM.ReceiveMessage");
             }
 
         }
         /// <summary>
         /// 取消息队列处理状态
         /// </summary>
-        /// <param name="robotWXID"></param>
         /// <returns></returns>
-        private bool GetTreatingStat(string robotWXID)
-        {
-            if (!_isTreating.ContainsKey(robotWXID)) _isTreating.TryAdd(robotWXID, false);
-            return _isTreating[robotWXID];
-        }
+        private bool GetTreatingStat() => _isTreating;
         /// <summary>
         /// 设置消息队列处理状态
         /// </summary>
-        /// <param name="robotWXID"></param>
         /// <param name="stat"></param>
-        public void SetTreatingStat(string robotWXID, bool stat)
-        {
-            if (!_isTreating.ContainsKey(robotWXID)) _isTreating.TryAdd(robotWXID, stat);
-            else _isTreating[robotWXID] = stat;
-        }
+        public void SetTreatingStat(bool stat) => _isTreating = stat;
         #endregion
 
         #region TREAT
         /// <summary>
         /// 处理消息队列
         /// </summary>
-        /// <param name="robotWXID"></param>
-        private async Task TreatMessages(string robotWXID)
+        private void TreatMessages()
         {
-            SetTreatingStat(robotWXID, true);
+            SetTreatingStat(true);
             do
             {
-                if (!_messageQueue.ContainsKey(robotWXID)) break;
-                if (_messageQueue[robotWXID].Count == 0) break;
-                _messageQueue[robotWXID].TryDequeue(out var message);
-                if (message is null) break;
+                if (_messageQueue.Count == 0) break;
+                _messageQueue.TryDequeue(out var message);
 
                 // 先检查等待响应
-                if (await TreatWatingRequest(message)) continue;
+                if (TreatWatingRequest(message)) continue;
+
+                var role = _context.ContactsM.QueryRole(message.Sender, message.RoomID);
 
                 // 检查ConfigM.SwitchCommunicateClose
                 if (_context.ConfigsM.SwitchCommunicateClose)
                 {
-                    if (_context.ContactsM.QueryRole(message.Self, message.WXID, message.Sender) < include.UserRole.ADMINISTRATOR)
+                    if (role < include.UserRole.ADMINISTRATOR)
                     {
                         continue;
                     }
+                }
+
+                // 拍一拍
+                if (message.Type == Tools.Common.Enums.WechatMessageType.Recall && role >= include.UserRole.PLAYER && message.Content.Contains("拍了拍我的屏幕说信号不太好"))
+                {
+                    _context.WechatM.SendPat(message.RoomID, message.Sender);
+                    continue;
                 }
 
                 // 目前只处理文本消息
                 if (message.Type == Tools.Common.Enums.WechatMessageType.Text) TreatTextMessage(message);
 
             } while (true);
-            SetTreatingStat(robotWXID, false);
+            SetTreatingStat(false);
         }
         /// <summary>
         /// 处理等待响应的消息
         /// </summary>
         /// <param name="message"></param>
         /// <returns></returns>
-        private async Task<bool> TreatWatingRequest(Message message)
+        private bool TreatWatingRequest(Message message)
         {
-            if (!_waitRequests.ContainsKey(message.Self) || _waitRequests[message.Self].Count <= 0) return false;
             var found = false;
             var now = TimeHelper.ToTimeStamp();
-            foreach (var item in _waitRequests[message.Self].ToArray())
+            var remove = new List<string>();
+
+            foreach (var item in _waitRequests.Values)
             {
                 // 超时的命令不予处理
                 if (item.StartTime + item.WaitTime <= now)
@@ -174,17 +168,19 @@ namespace RS.Snail.JJJ.robot.modules
                 // 发送者（群/个人）吻合 &
                 // 接受消息类型吻合 &
                 // 验证吻合
-                if (item.Sender == message.Sender && item.WXID == message.WXID &&
-                    (item.AcceptTypes is null || item.AcceptTypes.Contains(message.Type)) &&
-                    (item.Verify is null || item.Verify.Invoke(message)))
+                if (item.Sender == message.Sender && (item.RoomID ?? "") == (message.RoomID ?? "") &&
+                   (item.AcceptTypes is null || item.AcceptTypes.Contains(message.Type)) &&
+                   (item.Verify is null || item.Verify.Invoke(message)))
                 {
-                    await item.OnReceivedCallback(message);
+                    if (item.OnReceivedCallback is not null) item.OnReceivedCallback(message);
                     item.IsFinished = true;
                     found = true;
                 }
+
+                if (item.IsFinished) remove.Add(item.ID);
             }
 
-            _waitRequests[message.Self] = _waitRequests[message.Self].Where((a) => !a.IsFinished).ToList();
+            foreach (var key in remove) _waitRequests.TryRemove(key, out _);
 
             return found;
         }
@@ -192,15 +188,16 @@ namespace RS.Snail.JJJ.robot.modules
         /// 处理文本消息
         /// </summary>
         /// <param name="message"></param>
-        private async Task TreatTextMessage(Message message)
+        private void TreatTextMessage(Message message)
         {
             // CD
             if (_context.CdM.IsInCD(message)) return;
 
             // 命令来自消息头部，以空格隔开
-            var instru = message.Content.Split(" ").First().ToLower();
+            var instru = (message.ExplodeContent.FirstOrDefault() ?? "").ToLower();
             foreach (var item in _cmds)
             {
+
                 if (item.Value.AcceptMessageType != message.Type) continue;
                 if (!CheckEnableScene(item.Value.EnableScene, message)) continue;
                 if (!item.Value.Commands.Contains(instru) &&
@@ -208,15 +205,19 @@ namespace RS.Snail.JJJ.robot.modules
                    !item.Value.CommandsQP.Contains(instru)) continue;
                 if (!CheckRequestRole(item.Value.MinRole, message)) continue;
 
-                await item.Value.Do(message);
+                Task.Run(() => item.Value.Do(message));
                 return;
             }
+
             // 特殊指令
             if (message.Scene != include.ChatScene.Private)
             {
-                if (message.IsCallingJijiji)
+
+                if (message.IsCallingJijiji && _context.ContactsM.QueryRole(message.Sender, message.RoomID) >= include.UserRole.NORMAL)
                 {
-                    await CommonConversation(message, message.IsCallingJijiji);
+                    if (message.IsAtAll) _context.WechatM.SendText("我不[抠鼻]", message.RoomID);
+
+                    else CommonConversation(message, message.IsCallingJijiji);
                 }
             }
         }
@@ -225,20 +226,25 @@ namespace RS.Snail.JJJ.robot.modules
         /// </summary>
         /// <param name="msg"></param>
         /// <returns></returns>
-        private async Task<bool> CommonConversation(Message msg, bool isForce = false)
+        private bool CommonConversation(Message msg, bool isForce = false)
         {
+            if (_context.ConfigsM.SwitchConversationClose) return false;
             dynamic? response = null;
             if (msg.Scene == include.ChatScene.Private)
             {
-                response = await _context.ConversationM.QueryConversation("", msg.WXID, msg.Content, isForce);
+                response = _context.ConversationM.QueryConversation("", msg.Sender, msg.Content, isForce);
             }
             else
             {
-                var group = _context.ContactsM.FindGroup(msg.Self, msg.Sender);
+                var group = _context.ContactsM.FindGroup(msg.RoomID);
                 if (group is not null)
                 {
                     var rid = group.RID ?? "";
-                    response = await _context.ConversationM.QueryConversation(rid, msg.WXID, msg.Content, isForce);
+                    response = _context.ConversationM.QueryConversation(rid, msg.Sender, msg.Content, isForce);
+                }
+                else
+                {
+                    response = _context.ConversationM.QueryConversation("", msg.Sender, msg.Content, isForce);
                 }
             }
 
@@ -254,53 +260,63 @@ namespace RS.Snail.JJJ.robot.modules
 
         private bool CheckRequestRole(robot.include.UserRole? request, Message message)
         {
-            var role = _context.ContactsM.QueryRole(message.Self, message.WXID, message.Sender.Contains("@chatroom") ? message.Sender : "");
-            return role >= request;
+            var role = _context.ContactsM.QueryRole(message.Sender);
+            if (role >= request) return true;
+            if (message.IsGroup)
+            {
+                if (request == include.UserRole.PLAYER) return _context.ContactsM.IsPlayerGroup(message.RoomID);
+                if (request == include.UserRole.MAYDAY) return _context.ContactsM.IsMaydayGroup(message.RoomID);
+            }
+
+            return false;
         }
         #endregion
 
         #region REGISTER
-        public void RegistWaitMessageRequest(string robotWXID,
-                                             string sender, string wxid,
-                                             Func<Message, Task> onReceivedCallback,
+        public void RegistWaitMessageRequest(string roomID,
+                                             string sender,
+                                             Action<Message> onReceivedCallback,
                                              Func<Message, bool>? verifier = null,
                                              Action onTimeout = null,
                                              List<RS.Tools.Common.Enums.WechatMessageType>? acceptTypes = null,
                                              int waitSeconds = 10,
                                              string tag = "")
         {
-            if (!_waitRequests.ContainsKey(robotWXID)) _waitRequests.TryAdd(robotWXID, new List<WaitMessageRequest>());
-            _waitRequests[robotWXID].Add(new WaitMessageRequest()
+
+            var req = new WaitMessageRequest()
             {
                 Tag = tag,
                 Sender = sender,
-                WXID = wxid,
+                RoomID = roomID,
                 OnReceivedCallback = onReceivedCallback,
                 OnTimeOut = onTimeout,
                 AcceptTypes = acceptTypes,
                 Verify = verifier,
                 StartTime = TimeHelper.ToTimeStamp(),
                 WaitTime = waitSeconds,
-            });
+            };
+
+            _waitRequests.TryAdd(req.ID, req);
         }
 
-        public void UnregistWaitMessageRequest(string robotWXID, string sender, string wxid, string tag)
+
+        public void UnregistWaitMessageRequest(string roomID, string sender, string tag, bool invokeTimeoutCb = true)
         {
-            if (_waitRequests.ContainsKey(robotWXID))
+            var remove = new List<string>();
+            foreach (var item in _waitRequests.Values)
             {
-                _waitRequests[robotWXID] = _waitRequests[robotWXID].Where((a) =>
-                {
-                    a.OnTimeOut?.Invoke();
-                    return !(a.Tag == tag && a.Sender == sender && a.WXID == wxid);
-                }).ToList();
+                if (invokeTimeoutCb) item.OnTimeOut?.Invoke();
+                if (item.Tag == tag && item.Sender == sender && item.RoomID == roomID) remove.Add(item.ID);
             }
+
+            foreach (var key in remove) _waitRequests.TryRemove(key, out _);
         }
         private class WaitMessageRequest
         {
             public string Tag { get; set; }
             public string Sender { get; set; }
-            public string WXID { get; set; }
-            public Func<Message, Task>? OnReceivedCallback { get; set; }
+            public string RoomID { get; set; }
+            public Action<Message>? OnReceivedCallback { get; set; }
             public Action? OnTimeOut { get; set; }
             public List<RS.Tools.Common.Enums.WechatMessageType>? AcceptTypes { get; set; }
             public Func<Message, bool>? Verify { get; set; }
@@ -308,6 +324,7 @@ namespace RS.Snail.JJJ.robot.modules
             public long WaitTime { get; set; }
             public bool IsFinished { get; set; }
 
+            public string ID { get => $"{Tag}_{Sender}_{RoomID}_{StartTime}"; }
         }
         #endregion
 

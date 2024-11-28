@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 
 namespace RS.Snail.JJJ.robot.cmd.wechat
 {
-    
+
     internal class cmd_set_manager : ICMD
     {
         public Context _context { get; set; }
@@ -26,7 +26,7 @@ namespace RS.Snail.JJJ.robot.cmd.wechat
         public ChatScene EnableScene => ChatScene.Group;
         public UserRole MinRole => UserRole.GROUP_HOLDER;
         public WechatMessageType AcceptMessageType => WechatMessageType.Text;
-        async public Task Do(Message msg)
+        public void Do(Message msg)
         {
             try
             {
@@ -35,7 +35,7 @@ namespace RS.Snail.JJJ.robot.cmd.wechat
                 if (arr.Length < 2) return;
 
                 // 找到群
-                var group = _context.ContactsM.FindGroup(msg.Self, msg.Sender);
+                var group = _context.ContactsM.FindGroup(msg.RoomID);
                 if (group is not null && !string.IsNullOrEmpty(group.RID))
                 {
                     var purchase = _context.PurchaseM.CheckPurchase(group.RID, msg);
@@ -43,56 +43,45 @@ namespace RS.Snail.JJJ.robot.cmd.wechat
                     {
                         if (!string.IsNullOrEmpty(purchase.desc))
                         {
-                            _context.WechatM.SendAtText(purchase.desc,
-                                                  new List<string> { msg.WXID },
-                                                  msg.Self,
-                                                  msg.Sender);
+                            _context.WechatM.SendAtText(purchase.desc, new List<string> { msg.Sender }, msg.RoomID);
                         }
                         return;
                     }
                 }
                 if (group is null)
                 {
-                    _context.WechatM.SendAtText($"⚠️唧唧叽缺少当前微信群的资料，请联系超管使用命令\"刷新群信息\"。",
-                                                new List<string> { msg.WXID },
-                                                msg.Self,
-                                                msg.Sender);
+                    _context.WechatM.SendAtText($"⚠️唧唧叽缺少当前微信群的资料，请联系超管使用命令\"刷新群信息\"。", new List<string> { msg.Sender }, msg.RoomID);
                     return;
                 }
 
                 // 解析wxid
                 var wxid = "";
                 var ats = msg.AtWxids;
-                if (ats is not null && ats.Length > 0) wxid = ats[0];
+                if (ats is not null && ats.Count > 0) wxid = ats[0];
                 if (string.IsNullOrEmpty(wxid))
                 {
                     // 判断是否是wxid
-                    if (_context.ContactsM.IsGroupMemberWXID(arr[1], msg.Self, msg.Sender))
+                    if (_context.ContactsM.IsGroupMemberWXID(arr[1], msg.RoomID))
                     {
                         wxid = arr[1];
                     }
                     else
                     {
-                        var wxids = _context.ContactsM.QueryGroupMemberWXID(arr[1], msg.Self, msg.Sender);
+                        var wxids = _context.ContactsM.QueryGroupMemberWXID(arr[1], msg.RoomID);
 
                         // 没有找到成员
-                        if (wxids is null)
+                        if (wxids is null || wxids.Count == 0)
                         {
-                            _context.WechatM.SendAtText($"⚠️在设置经理时没有找到昵称为[{arr[1]}]的群成员。",
-                                                        new List<string> { msg.WXID },
-                                                        msg.Self,
-                                                        msg.Sender);
+                            _context.WechatM.SendAtText($"⚠️在设置经理时没有找到昵称为[{arr[1]}]的群成员。", new List<string> { msg.Sender }, msg.RoomID);
                             return;
                         }
                         // 找到多个成员
                         else if (wxids.Count > 1)
                         {
                             _context.WechatM.SendAtText($"⚠️在设置经理时找到多个可能的群成员，昵称和id如下:\n" +
-                                                        $"{string.Join("\n", wxids.Select((a) => $"[{_context.ContactsM.QueryGroupMemberNick(a, msg.Self, msg.Sender)}]{a}"))}\n" +
+                                                        $"{string.Join("\n", wxids.Select((a) => $"[{_context.ContactsM.QueryGroupMemberNick(a, msg.RoomID)}]{a}"))}\n" +
                                                         $"⚠️请使用以上正确的id重新设置，例如\"设置经理 {wxids[0]}\"",
-                                                        new List<string> { msg.WXID },
-                                                        msg.Self,
-                                                        msg.Sender);
+                                                        new List<string> { msg.Sender }, msg.RoomID);
                             return;
                         }
 
@@ -106,31 +95,23 @@ namespace RS.Snail.JJJ.robot.cmd.wechat
                 if (!group.Members.ContainsKey(wxid))
                 {
                     _context.WechatM.SendAtText($"⚠️唧唧叽缺少当前微信群内该成员的资料，请联系会长使用命令\"刷新群信息\"。",
-                                               new List<string> { msg.WXID },
-                                               msg.Self,
-                                               msg.Sender);
+                                                new List<string> { msg.Sender }, msg.RoomID);
                     return;
                 }
 
                 if (group.Members[wxid].Role == include.UserRole.GROUP_MANAGER)
                 {
-                    var targetNick = _context.ContactsM.QueryGroupMemberNick(wxid, msg.Self, msg.Sender);
-                    _context.WechatM.SendAtText($"{targetNick}已经是本群的经理了。",
-                                                new List<string> { msg.WXID },
-                                                msg.Self,
-                                                msg.Sender);
+                    var targetNick = _context.ContactsM.QueryGroupMemberNick(wxid, msg.RoomID);
+                    _context.WechatM.SendAtText($"{targetNick}已经是本群的经理了。", new List<string> { msg.Sender }, msg.RoomID);
                     return;
                 }
 
                 // 找到俱乐部
                 var rid = group.RID;
-                var club = _context.ClubsM.FindClub(msg.Self, rid);
+                var club = _context.ClubsM.FindClub(rid);
                 if (club is null)
                 {
-                    _context.WechatM.SendAtText($"⚠️要设置的俱乐部[{rid}]不存在。",
-                                                new List<string> { msg.WXID },
-                                                msg.Self,
-                                                msg.Sender);
+                    _context.WechatM.SendAtText($"⚠️要设置的俱乐部[{rid}]不存在。", new List<string> { msg.Sender }, msg.RoomID);
                     return;
                 }
 
@@ -148,19 +129,13 @@ namespace RS.Snail.JJJ.robot.cmd.wechat
 
                 // 
 
-                var result = _context.ContactsM.SetManager(msg.Self, group.WXID, wxid);
-                if (result) _context.WechatM.SendAtText($"您已经被指派本群（{club?.Name ?? "新俱乐部"}-{rid}）经理权限。\n",
-                                                       new List<string> { wxid },
-                                                       msg.Self,
-                                                       msg.Sender);
-                else _context.WechatM.SendAtText("⚠️因未知原因，操作失败了。",
-                                                new List<string> { msg.WXID },
-                                                msg.Self,
-                                                msg.Sender);
+                var result = _context.ContactsM.SetManager(group.WXID, wxid);
+                if (result) _context.WechatM.SendAtText($"您已经被指派本群（{club?.Name ?? "新俱乐部"}-{rid}）经理权限。\n", new List<string> { wxid }, msg.RoomID);
+                else _context.WechatM.SendAtText("⚠️因未知原因，操作失败了。", new List<string> { msg.Sender }, msg.RoomID);
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, Tag);
+                Context.Logger.WriteException(ex, Tag);
             }
         }
     }

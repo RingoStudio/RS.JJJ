@@ -15,7 +15,7 @@ using System.Threading.Tasks;
 
 namespace RS.Snail.JJJ.utils
 {
-    internal class ImageHelper
+    internal class GWImageHelper
     {
         private const string TAG = "ImageHelper";
         private static Color _colorDarkGray = Color.FromArgb(35, 24, 31);
@@ -41,7 +41,7 @@ namespace RS.Snail.JJJ.utils
                 }
                 catch (Exception ex)
                 {
-                    Logger.Instance.Write(ex, TAG);
+                    Logger.Instance.WriteException(ex, TAG);
                     return null;
                 }
             }
@@ -68,7 +68,7 @@ namespace RS.Snail.JJJ.utils
                 }
                 catch (Exception ex)
                 {
-                    Logger.Instance.Write(ex, TAG);
+                    Logger.Instance.WriteException(ex, TAG);
                     return "";
                 }
             }
@@ -87,7 +87,8 @@ namespace RS.Snail.JJJ.utils
                                                     string type,
                                                     string duration,
                                                     string clubName,
-                                                    Dictionary<Kit, List<string>> names)
+                                                    Dictionary<Kit, List<string>> names,
+                                                    List<string> locks)
         {
             try
             {
@@ -173,7 +174,7 @@ namespace RS.Snail.JJJ.utils
                             default:
                                 continue;
                         }
-                        color = Color.Black;
+                        color = locks.Contains(name) ? Color.DarkBlue : Color.Black;
                         DrawStringAct(ref g,
                                      name,
                                      FontHelper.GetFont(FontHelper.FontWeight.Bold, 30),
@@ -188,7 +189,7 @@ namespace RS.Snail.JJJ.utils
             }
             catch (Exception ex)
             {
-                Logger.Instance.Write(ex, "ImageHelper.GetGWSuitImage");
+                Logger.Instance.WriteException(ex, "ImageHelper.GetGWSuitImage");
                 return null;
             }
         }
@@ -254,7 +255,7 @@ namespace RS.Snail.JJJ.utils
             }
             catch (Exception ex)
             {
-                Logger.Instance.Write(ex, "ImageHelper.GetEventMineImage");
+                Logger.Instance.WriteException(ex, "ImageHelper.GetEventMineImage");
                 return null;
             }
         }
@@ -332,7 +333,7 @@ namespace RS.Snail.JJJ.utils
             }
             catch (Exception ex)
             {
-                Logger.Instance.Write(ex, "ImageHelper.GetEventMultiImage");
+                Logger.Instance.WriteException(ex, "ImageHelper.GetEventMultiImage");
                 return null;
             }
         }
@@ -412,7 +413,7 @@ namespace RS.Snail.JJJ.utils
             }
             catch (Exception ex)
             {
-                Logger.Instance.Write(ex, "ImageHelper.GetEventBossImage");
+                Logger.Instance.WriteException(ex, "ImageHelper.GetEventBossImage");
                 return null;
             }
         }
@@ -544,7 +545,7 @@ namespace RS.Snail.JJJ.utils
             }
             catch (Exception ex)
             {
-                Logger.Instance.Write(ex, "ImageHelper.GetEvenSumImage");
+                Logger.Instance.WriteException(ex, "ImageHelper.GetEvenSumImage");
                 return null;
             }
         }

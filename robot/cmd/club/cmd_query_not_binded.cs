@@ -28,30 +28,24 @@ namespace RS.Snail.JJJ.robot.cmd.club
         public ChatScene EnableScene => ChatScene.Group;
         public UserRole MinRole => UserRole.GROUP_MANAGER;
         public WechatMessageType AcceptMessageType => WechatMessageType.Text;
-        async public Task Do(Message msg)
+        public void Do(Message msg)
         {
             try
             {
                 // 找到群
-                var group = _context.ContactsM.FindGroup(msg.Self, msg.Sender);
+                var group = _context.ContactsM.FindGroup(msg.RoomID);
                 if (group is null)
                 {
-                    _context.WechatM.SendAtText($"⚠️唧唧叽缺少当前微信群的资料，请联系超管使用命令\"刷新群信息\"。",
-                                                new List<string> { msg.WXID },
-                                                msg.Self,
-                                                msg.Sender);
+                    _context.WechatM.SendAtText($"⚠️唧唧叽缺少当前微信群的资料，请联系超管使用命令\"刷新群信息\"。", new List<string> { msg.Sender }, msg.RoomID);
                     return;
                 }
 
                 // 找到俱乐部
                 var rid = group.RID;
-                var club = _context.ClubsM.FindClub(msg.Self, rid);
+                var club = _context.ClubsM.FindClub(rid);
                 if (club is null)
                 {
-                    _context.WechatM.SendAtText($"⚠️当前微信群绑定的俱乐部 [{rid}] 不存在。",
-                                                new List<string> { msg.WXID },
-                                                msg.Self,
-                                                msg.Sender);
+                    _context.WechatM.SendAtText($"⚠️当前微信群绑定的俱乐部 [{rid}] 不存在。", new List<string> { msg.Sender }, msg.RoomID);
                     return;
                 }
 
@@ -60,52 +54,47 @@ namespace RS.Snail.JJJ.robot.cmd.club
                 if (club.Members.Count < 20)
                 {
                     _context.WechatM.SendAtText($"⚠️当前微信群绑定的俱乐部 [{club.Name} {rid}] 成员数量异常。\n" +
-                                               $"请重新登录更新成员数据后再试。",
-                                                new List<string> { msg.WXID },
-                                                msg.Self,
-                                                msg.Sender);
+                                                $"请重新登录更新成员数据后再试。",
+                                                new List<string> { msg.Sender }, msg.RoomID);
                     return;
                 }
 
-                await Task.Run(() =>
-                {
-                    var existUIDs = new List<string>();
+                var existUIDs = new List<string>();
 
-                    foreach (var member in group.Members)
+                foreach (var member in group.Members)
+                {
+                    if (member.Value.UIDs is not null)
                     {
-                        if (member.Value.UIDs is not null)
+                        foreach (var uid in member.Value.UIDs)
                         {
-                            foreach (var uid in member.Value.UIDs)
-                            {
-                                if (!existUIDs.Contains(uid)) existUIDs.Add(uid);
-                            }
+                            if (!existUIDs.Contains(uid)) existUIDs.Add(uid);
                         }
                     }
+                }
 
-                    var ret = club.Members.DeepCopy()
-                             .Except(existUIDs)
-                             .ToList()
-                             .Select((uid) => $"[{_context.ClubsM.QueryMemberName(msg.Self, uid)}] {uid}")
-                             .ToList();
+                var ret = club.Members.DeepCopy()
+                         .Except(existUIDs)
+                         .ToList()
+                         .Select((uid) => $"[{_context.ClubsM.QueryMemberName(uid)}] {uid}")
+                         .ToList();
 
-                    var result = "";
-                    if (ret.Count > 20) result = $"共找到 {ret.Count} 个未绑定游戏角色, 请发送\"查询成员总览\"查看详情。";
-                    else if (ret.Count > 0) result = $"共找到 {ret.Count} 个未绑定游戏角色 ([昵称] UID): \n" + string.Join("\n", ret);
-                    else result = "大家都绑定好啦~";
+                var result = "";
+                if (ret.Count > 0) result = $"共找到 {ret.Count} 个未绑定游戏角色 ([昵称] UID): \n" + string.Join("\n", ret);
+                else result = "大家都绑定好啦~";
 
-                    _context.WechatM.SendAtText(result,
-                                               new List<string> { msg.WXID },
-                                               msg.Self,
-                                               msg.Sender);
-                });
+                if (result.Length > 200)
+                {
+                    var fileName = $"OUT\\未绑定成员查询结果_@{_context.ContactsM.QueryGroupMemberNickForFile(msg.Sender, msg.RoomID)}_{DateTime.Now.ToString("yyyy_MM_dd_HH_mm_ss")}.txt";
+                    fileName = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, fileName);
+                    System.IO.File.WriteAllText(fileName, result);
+                    _context.WechatM.SendFile(fileName, msg.RoomID);
+                }
+                else _context.WechatM.SendAtText(result, new List<string> { msg.Sender }, msg.RoomID);
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, Tag);
-                _context.WechatM.SendAtText("因未知原因，操作失败了，具体原因见日志。",
-                                                new List<string> { msg.WXID },
-                                                msg.Self,
-                                                msg.Sender);
+                Context.Logger.WriteException(ex, Tag);
+                _context.WechatM.SendAtText("因未知原因，操作失败了，具体原因见日志。", new List<string> { msg.Sender }, msg.RoomID);
             }
         }
     }

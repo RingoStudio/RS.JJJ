@@ -26,7 +26,7 @@ namespace RS.Snail.JJJ.robot.cmd.club
         public UserRole MinRole { get; } = include.UserRole.ADMINISTRATOR;
         public WechatMessageType AcceptMessageType { get; } = Tools.Common.Enums.WechatMessageType.Text;
 
-        async public Task Do(Message msg)
+        public void Do(Message msg)
         {
             try
             {
@@ -51,37 +51,36 @@ namespace RS.Snail.JJJ.robot.cmd.club
                         case "安卓":
                             channelType = ChannelType.ANDROID;
                             break;
+                        case "gz":
+                        case "光子":
+                            channelType = ChannelType.GUANGZI;
+                            break;
                         default:
                             break;
                     }
                 }
 
-                var club = _context.ClubsM.FindClub(msg.Self, rid);
+                var club = _context.ClubsM.FindClub(rid);
                 if (club is not null)
                 {
                     _context.WechatM.SendAtText($"⚠️已存在俱乐部: {club.Name} [{club.RID}]，添加失败！",
-                                                   new List<string> { msg.WXID },
-                                                   msg.Self,
-                                                   msg.Sender);
+                                                   new List<string> { msg.Sender }, msg.RoomID);
 
                     return;
                 }
 
-                var result = _context.ClubsM.AddClub(msg.Self, rid, channelType);
+                var result = _context.ClubsM.AddClub(rid, channelType);
                 if (!result) _context.WechatM.SendAtText("⚠️因未知原因，操作失败了。",
-                                                         new List<string> { msg.WXID },
-                                                         msg.Self,
-                                                         msg.Sender);
+                                                         new List<string> { msg.Sender },
+                                                         msg.RoomID);
                 else _context.WechatM.SendAtText($"⚠️已成功添加俱乐部 [{rid} {include.club.ChannelTypeDesc(channelType)}]。\n" +
-                                                 $"请立即设置会长和登录账号。", new List<string> { msg.WXID }, msg.Self, msg.Sender);
+                                                 $"请立即设置会长和登录账号。", new List<string> { msg.Sender }, msg.RoomID);
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, Tag);
+                Context.Logger.WriteException(ex, Tag);
                 _context.WechatM.SendAtText("⚠️因未知原因，操作失败了。",
-                                                new List<string> { msg.WXID },
-                                                msg.Self,
-                                                msg.Sender);
+                                                new List<string> { msg.Sender }, msg.RoomID);
             }
         }
     }

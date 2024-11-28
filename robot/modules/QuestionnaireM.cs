@@ -58,7 +58,7 @@ namespace RS.Snail.JJJ.robot.modules
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, $"QuestionnaireM.LoadCSV");
+                Context.Logger.WriteException(ex, $"QuestionnaireM.LoadCSV");
             }
         }
 
@@ -70,7 +70,7 @@ namespace RS.Snail.JJJ.robot.modules
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, $"QuestionnaireM.SaveCSV");
+                Context.Logger.WriteException(ex, $"QuestionnaireM.SaveCSV");
             }
 
         }
@@ -135,13 +135,12 @@ namespace RS.Snail.JJJ.robot.modules
         /// </summary>
         /// <param name="question"></param>
         /// <param name="answer"></param>
-        /// <param name="robotWxid"></param>
         /// <param name="club"></param>
         /// <param name="group"></param>
         /// <param name="uid"></param>
         /// <param name="wxid"></param>
         /// <returns></returns>
-        public (bool result, string? desc) SetAnswer(string question, string answer, string robotWxid, Club club, Group group, string wxid, string uid = "")
+        public (bool result, string? desc) SetAnswer(string question, string answer, Club club, Group group, string wxid, string uid = "")
         {
             lock (_answerLocker)
             {
@@ -150,7 +149,6 @@ namespace RS.Snail.JJJ.robot.modules
                     if (_questionnaires[question] is null) return (false, "调查问题不存在");
                     _questionnaires[question]["answer"] = _questionnaires[question]["answer"] ?? new JObject();
                     _questionnaires[question]["answer"][wxid] = new JObject();
-                    _questionnaires[question]["answer"][wxid]["robot"] = robotWxid;
                     _questionnaires[question]["answer"][wxid]["time"] = TimeHelper.ToTimeStamp();
                     _questionnaires[question]["answer"][wxid]["club_rid"] = club.RID;
                     _questionnaires[question]["answer"][wxid]["club_name"] = club.Name;
@@ -161,13 +159,13 @@ namespace RS.Snail.JJJ.robot.modules
                     _questionnaires[question]["answer"][wxid]["group_member_nick"] = group.Members.ContainsKey(wxid) ? group.Members[wxid].NickName : "";
                     _questionnaires[question]["answer"][wxid]["game_uid"] = uid;
                     _questionnaires[question]["answer"][wxid]["answer"] = answer;
-                    var clubMember = _context.ClubsM.FindMember(robotWxid, uid);
+                    var clubMember = _context.ClubsM.FindMember(uid);
                     if (clubMember is not null) _questionnaires[question][wxid]["game_name"] = clubMember.NameOrUID();
                     return (true, null);
                 }
                 catch (Exception ex)
                 {
-                    Context.Logger.Write(ex, $"QuestionnaireM.AnswerQuestionnaire");
+                    Context.Logger.WriteException(ex, $"QuestionnaireM.AnswerQuestionnaire");
                     return (false, "发生了未知错误");
                 }
             }
@@ -186,7 +184,7 @@ namespace RS.Snail.JJJ.robot.modules
         /// <returns></returns>
         public string? GetQuestionnaireExcel(string question = "")
         {
-            var fileName = $"OUT\\{ExcelHelper.GetFileName($"问卷调查_{(string.IsNullOrEmpty(question) ? "所有" : question)}")}";
+            var fileName = $"OUT\\{ExcelHelper.GetFileName($"{include.files.File_Questionnaires}_{(string.IsNullOrEmpty(question) ? "所有" : question)}")}";
             var now = TimeHelper.ToTimeStamp();
             try
             {
@@ -247,7 +245,7 @@ namespace RS.Snail.JJJ.robot.modules
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, $"QuestionnaireM.GetQuestionnaireExcel");
+                Context.Logger.WriteException(ex, $"QuestionnaireM.GetQuestionnaireExcel");
                 return null;
             }
         }

@@ -12,7 +12,6 @@ namespace RS.Snail.JJJ.clone
 {
     internal class ClubEvents
     {
-        public string RobotWxid { get; private set; }
         public ChannelType ChannelType { get; private set; }
         public int DistSort { get; private set; }
 
@@ -21,15 +20,14 @@ namespace RS.Snail.JJJ.clone
 
         public long UpdateTime { get; set; }
 
-        public string Tag { get => $"{RobotWxid}_{ChannelType}_{DistSort}_{ShareKey}"; }
+        public string Tag { get => $"{ChannelType}_{DistSort}_{ShareKey}"; }
 
         public ClubEvents()
         {
             _events = new();
         }
-        public ClubEvents(string robotWxid, ChannelType channelType, int distSort, string shareKey)
+        public ClubEvents(ChannelType channelType, int distSort, string shareKey)
         {
-            RobotWxid = robotWxid;
             ChannelType = channelType;
             DistSort = distSort;
             _events = new();
@@ -41,13 +39,12 @@ namespace RS.Snail.JJJ.clone
         {
             ChannelType = (ChannelType)JSONHelper.ParseInt(data.channel_type);
             DistSort = JSONHelper.ParseInt(data.dist_sort);
-            RobotWxid = JSONHelper.ParseString(data.robot_wxid);
             ShareKey = JSONHelper.ParseString(data.share_key);
             UpdateTime = JSONHelper.ParseLong(data.update_time);
             _events = new();
             foreach (var item in data.events ?? new JObject())
             {
-                var one = new ClubEvent(JSONHelper.ParseString(item.Value), item.Name);
+                var one = new ClubEvent( item.Name, JSONHelper.ParseString(item.Value));
                 _events.Add(one.Pos, one);
             }
 
@@ -66,7 +63,6 @@ namespace RS.Snail.JJJ.clone
             {
                 channel_type = ChannelType,
                 dist_sort = DistSort,
-                robot_wxid = RobotWxid,
                 share_key = ShareKey,
                 update_time = UpdateTime,
                 events = dic,
@@ -77,7 +73,7 @@ namespace RS.Snail.JJJ.clone
         {
             foreach (var item in data ?? new JObject())
             {
-                var one = new ClubEvent(JSONHelper.ParseString(item.Value), item.Name);
+                var one = new ClubEvent(item.Name, JSONHelper.ParseString(item.Value));
                 var pos = one.Pos;
                 _events[pos] = one;
             }

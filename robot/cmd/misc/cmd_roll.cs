@@ -12,22 +12,22 @@ using System.Threading.Tasks;
 namespace RS.Snail.JJJ.robot.cmd.misc
 {
     
-    internal class cmd_role : ICMD
+    internal class cmd_roll : ICMD
     {
         public Context _context { get; set; }
-        public cmd_role(Context context)
+        public cmd_roll(Context context)
         {
             _context = context;
         }
         public List<string> Commands => new List<string> { "roll","摇骰子","摇色字","随机数" };
         public List<string> CommandsJP { get => Commands.Select(a => Pinyin.GetInitials(a).ToLower()).ToList(); }
         public List<string> CommandsQP { get => Commands.Select(a => Pinyin.GetPinyin(a).ToLower()).ToList(); }
-        public string Tag => "cmd_role";
+        public string Tag => "cmd_roll";
         public ChatScene EnableScene => ChatScene.All;
-        public UserRole MinRole => UserRole.GROUP_MANAGER;
+        public UserRole MinRole => UserRole.PLAYER;
         public WechatMessageType AcceptMessageType => WechatMessageType.Text;
 
-        async public Task Do(Message msg)
+        public void Do(Message msg)
         {
             try
             {
@@ -40,13 +40,11 @@ namespace RS.Snail.JJJ.robot.cmd.misc
                 min = list.Min();
                 var result = new Random().NextInt64(min, max + 1);
                 _context.WechatM.SendAtText($"ROLL {min}~{max} 结果:\n  [{result}]",
-                                           new List<string> { msg.WXID },
-                                           msg.Self,
-                                           msg.Sender);
+                                            new List<string> { msg.Sender }, msg.RoomID);
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, Tag);
+                Context.Logger.WriteException(ex, Tag);
             }
         }
     }

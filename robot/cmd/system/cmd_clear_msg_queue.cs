@@ -27,37 +27,30 @@ namespace RS.Snail.JJJ.robot.cmd.system
         public ChatScene EnableScene => ChatScene.All;
         public UserRole MinRole => UserRole.ADMINISTRATOR;
         public WechatMessageType AcceptMessageType => WechatMessageType.Text;
-        async public Task Do(Message msg)
+        public void Do(Message msg)
         {
-            await Task.Run(() =>
-              {
-                  try
-                  {
-                      var arr = msg.ExplodeContent;
-                      var isAll = false;
-                      if (arr.Length > 1 && (arr[1].ToLower() == "all" || arr[1] == "全部" || arr[1] == "所有")) isAll = true;
+            try
+            {
+                var arr = msg.ExplodeContent;
+                var isAll = false;
+                if (arr.Length > 1 && (arr[1].ToLower() == "all" || arr[1] == "全部" || arr[1] == "所有")) isAll = true;
 
-                      if (isAll)
-                      {
-                          _context.WechatM.ClearMessageQueue();
-                          _context.WechatM.SendMgrNotice($"{include.emoji.ZHUYI}已清空待发送的消息队列，已在队列内的回复将全部取消");
-                      }
-                      else
-                      {
-                          _context.WechatM.ClearMessageQueue(msg.Self);
-                          _context.WechatM.SendMgrNotice($"{include.emoji.ZHUYI}已清空待发送的消息队列，已在队列内的回复将全部取消", msg.Self);
-                      }
-                  }
-                  catch (Exception ex)
-                  {
-                      Context.Logger.Write(ex, Tag);
-                      _context.WechatM.SendAtText("⚠️因未知原因，操作失败了。",
-                                                  new List<string> { msg.WXID },
-                                                  msg.Self,
-                                                  msg.Sender);
-                  }
-              });
-
+                if (isAll)
+                {
+                    _context.WechatM.ClearMessageQueue();
+                    _context.WechatM.SendMgrNotice($"{include.emoji.ZHUYI}已清空待发送的消息队列，已在队列内的回复将全部取消");
+                }
+                else
+                {
+                    _context.WechatM.ClearMessageQueue();
+                    _context.WechatM.SendMgrNotice($"{include.emoji.ZHUYI}已清空待发送的消息队列，已在队列内的回复将全部取消");
+                }
+            }
+            catch (Exception ex)
+            {
+                Context.Logger.WriteException(ex, Tag);
+                _context.WechatM.SendAtText("⚠️因未知原因，操作失败了。", new List<string> { msg.Sender }, msg.RoomID);
+            }
         }
     }
 }

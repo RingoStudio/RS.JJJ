@@ -41,11 +41,11 @@ namespace RS.Snail.JJJ.robot.cmd.misc
             _context = context;
         }
 
-        async public Task Do(Message msg)
+        public void Do(Message msg)
         {
             try
             {
-                _context.CommunicateM.UnregistWaitMessageRequest(msg.Self, msg.Sender, msg.WXID, _continueTag);
+                _context.CommunicateM.UnregistWaitMessageRequest(msg.RoomID, msg.Sender, _continueTag);
                 var arr = msg.ExplodeContent;
                 if (arr.Length < 2) return;
                 var instru = arr.First();
@@ -59,14 +59,14 @@ namespace RS.Snail.JJJ.robot.cmd.misc
                                            "你最多可以发送不超过500字的文本，和最多3个附件。\n" +
                                            "若想终止以上广播，请发送\"取消\"。\n" +
                                            "以上操作20秒内有效，超时未回复将自动终止发送。",
-                                           new List<string> { msg.WXID },
-                                           msg.Self,
-                                           msg.Sender);
+                                           new List<string> { msg.Sender },
+                                           msg.RoomID,
+                                           true);
                 Loops(msg);
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, Tag);
+                Context.Logger.WriteException(ex, Tag);
             }
         }
 
@@ -91,7 +91,7 @@ namespace RS.Snail.JJJ.robot.cmd.misc
 
             try
             {
-                _context.CommunicateM.RegistWaitMessageRequest(msg.Self, msg.Sender, msg.WXID,
+                _context.CommunicateM.RegistWaitMessageRequest(msg.RoomID, msg.Sender,
                                                               onReceivedCallback: OnMessageArrival,
                                                               verifier: null,
                                                               onTimeout: new Action(() =>
@@ -104,11 +104,10 @@ namespace RS.Snail.JJJ.robot.cmd.misc
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, Tag);
+                Context.Logger.WriteException(ex, Tag);
                 _context.WechatM.SendAtText("因未知原因，操作失败了，具体原因见日志。",
-                                            new List<string> { msg.WXID },
-                                            msg.Self,
-                                            msg.Sender);
+                                            new List<string> { msg.Sender },
+                                            msg.RoomID);
             }
         }
 
@@ -118,7 +117,7 @@ namespace RS.Snail.JJJ.robot.cmd.misc
             _broadCasts.TryRemove(_id, out _);
         }
 
-        private async Task OnMessageArrival(Message msg)
+        private void OnMessageArrival(Message msg)
         {
             try
             {
@@ -147,9 +146,8 @@ namespace RS.Snail.JJJ.robot.cmd.misc
                                                         AttackDesc(bc.ContentLength, bc.AttachCount) +
                                                         "若想终止以上广播，请发送\"取消\"。\n" +
                                                         "以上操作20秒内有效，超时未回复将自动终止发送。",
-                                                        new List<string> { msg.WXID },
-                                                        msg.Self,
-                                                        msg.Sender);
+                                                        new List<string> { msg.Sender },
+                                                        msg.RoomID);
                             Loops(msg);
                         }
                         else
@@ -160,15 +158,15 @@ namespace RS.Snail.JJJ.robot.cmd.misc
                                                         AttackDesc(bc.ContentLength, bc.AttachCount) +
                                                         "若想终止以上广播，请发送\"取消\"。\n" +
                                                         "以上操作20秒内有效，超时未回复将自动终止发送。",
-                                                        new List<string> { msg.WXID },
-                                                        msg.Self,
-                                                        msg.Sender);
+                                                        new List<string> { msg.Sender },
+                                                        msg.RoomID);
                             Loops(msg);
                         }
                     }
                 }
                 else if (msg.Type == Tools.Common.Enums.WechatMessageType.File)
                 {
+                    // 文件附件
                     if (bc.AttachCount > _maxCount)
                     {
                         _context.WechatM.SendAtText($"附件数量已经达到{_maxCount}，无法继续添加。\n" +
@@ -176,9 +174,8 @@ namespace RS.Snail.JJJ.robot.cmd.misc
                                                    AttackDesc(bc.ContentLength, bc.AttachCount) +
                                                    "若想终止以上广播，请发送\"取消\"。\n" +
                                                    "以上操作20秒内有效，超时未回复将自动终止发送。",
-                                                   new List<string> { msg.WXID },
-                                                   msg.Self,
-                                                   msg.Sender);
+                                                   new List<string> { msg.Sender },
+                                                   msg.RoomID);
                         Loops(msg);
                     }
                     else
@@ -191,9 +188,8 @@ namespace RS.Snail.JJJ.robot.cmd.misc
                                                         AttackDesc(bc.ContentLength, bc.AttachCount) +
                                                         "若想终止以上广播，请发送\"取消\"。\n" +
                                                         "以上操作20秒内有效，超时未回复将自动终止发送。",
-                                                        new List<string> { msg.WXID },
-                                                        msg.Self,
-                                                        msg.Sender); ;
+                                                        new List<string> { msg.Sender },
+                                                        msg.RoomID); ;
                             Loops(msg);
                         }
                         else if (bc.Files.Contains(path))
@@ -203,9 +199,8 @@ namespace RS.Snail.JJJ.robot.cmd.misc
                                                         AttackDesc(bc.ContentLength, bc.AttachCount) +
                                                         "若想终止以上广播，请发送\"取消\"。\n" +
                                                         "以上操作20秒内有效，超时未回复将自动终止发送。",
-                                                        new List<string> { msg.WXID },
-                                                        msg.Self,
-                                                        msg.Sender);
+                                                        new List<string> { msg.Sender },
+                                                        msg.RoomID);
                             Loops(msg);
                         }
                         else
@@ -216,9 +211,8 @@ namespace RS.Snail.JJJ.robot.cmd.misc
                                                         AttackDesc(bc.ContentLength, bc.AttachCount) +
                                                         "若想终止以上广播，请发送\"取消\"。\n" +
                                                         "以上操作20秒内有效，超时未回复将自动终止发送。",
-                                                        new List<string> { msg.WXID },
-                                                        msg.Self,
-                                                        msg.Sender);
+                                                        new List<string> { msg.Sender },
+                                                        msg.RoomID);
                             Loops(msg);
                         }
                     }
@@ -226,6 +220,7 @@ namespace RS.Snail.JJJ.robot.cmd.misc
                 }
                 else if (msg.Type == Tools.Common.Enums.WechatMessageType.Image)
                 {
+                    // 图片附件
                     var path = _context.WechatM.GetImagePath(msg);
                     if (!System.IO.File.Exists(path))
                     {
@@ -234,9 +229,8 @@ namespace RS.Snail.JJJ.robot.cmd.misc
                                                     AttackDesc(bc.ContentLength, bc.AttachCount) +
                                                     "若想终止以上广播，请发送\"取消\"。\n" +
                                                     "以上操作20秒内有效，超时未回复将自动终止发送。",
-                                                    new List<string> { msg.WXID },
-                                                    msg.Self,
-                                                    msg.Sender);
+                                                    new List<string> { msg.Sender },
+                                                    msg.RoomID);
                         Loops(msg);
                     }
                     else if (bc.Images.Contains(path))
@@ -246,9 +240,8 @@ namespace RS.Snail.JJJ.robot.cmd.misc
                                               AttackDesc(bc.ContentLength, bc.AttachCount) +
                                               "若想终止以上广播，请发送\"取消\"。\n" +
                                               "以上操作20秒内有效，超时未回复将自动终止发送。",
-                                              new List<string> { msg.WXID },
-                                              msg.Self,
-                                              msg.Sender);
+                                              new List<string> { msg.Sender },
+                                              msg.RoomID);
                         Loops(msg);
                     }
                     else
@@ -259,20 +252,18 @@ namespace RS.Snail.JJJ.robot.cmd.misc
                                                       AttackDesc(bc.ContentLength, bc.AttachCount) +
                                                       "若想终止以上广播，请发送\"取消\"。\n" +
                                                       "以上操作20秒内有效，超时未回复将自动终止发送。",
-                                                      new List<string> { msg.WXID },
-                                                      msg.Self,
-                                                      msg.Sender);
+                                                      new List<string> { msg.Sender },
+                                                      msg.RoomID);
                         Loops(msg);
                     }
                 }
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, _continueTag);
+                Context.Logger.WriteException(ex, _continueTag);
                 _context.WechatM.SendAtText("因未知原因，操作失败了，具体原因见日志。",
-                                       new List<string> { msg.WXID },
-                msg.Self,
-                msg.Sender);
+                                       new List<string> { msg.Sender },
+                msg.RoomID);
             }
 
         }
@@ -289,26 +280,25 @@ namespace RS.Snail.JJJ.robot.cmd.misc
             try
             {
                 var text = string.Join("\n", texts);
-                foreach (var chatroom in _context.ContactsM.GetAllGroupWXID(msg.Self, true))
+                foreach (var chatroom in _context.ContactsM.GetAllGroupWXID(true))
                 {
-                    _context.WechatM.SendText(text, msg.Self, chatroom);
+                    _context.WechatM.SendText(text, chatroom);
                     foreach (var path in images)
                     {
-                        _context.WechatM.SendImage(path, msg.Self, chatroom);
+                        _context.WechatM.SendImage(path,chatroom);
                     }
                     foreach (var path in files)
                     {
-                        _context.WechatM.SendFile(path, msg.Self, chatroom);
+                        _context.WechatM.SendFile(path, chatroom);
                     }
                 }
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, Tag);
+                Context.Logger.WriteException(ex, Tag);
                 _context.WechatM.SendAtText("因未知原因，操作失败了，具体原因见日志。",
-                                            new List<string> { msg.WXID },
-                                            msg.Self,
-                                            msg.Sender);
+                                            new List<string> { msg.Sender },
+                                            msg.RoomID);
             }
         }
     }

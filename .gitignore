@@ -2,5 +2,9 @@ bin/
 obj/
 .vs/
 
+clone/Club.cs
+robot/modules/ClubsM.cs
+utils/AIConversationHelper.cs
+
 *.docx
 *.doc

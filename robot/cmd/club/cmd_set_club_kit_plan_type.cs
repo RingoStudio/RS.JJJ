@@ -27,7 +27,7 @@ namespace RS.Snail.JJJ.robot.cmd.club
         public ChatScene EnableScene => ChatScene.All;
         public UserRole MinRole => UserRole.GROUP_MANAGER;
         public WechatMessageType AcceptMessageType => WechatMessageType.Text;
-        async public Task Do(Message msg)
+        public void Do(Message msg)
         {
             try
             {
@@ -53,6 +53,39 @@ namespace RS.Snail.JJJ.robot.cmd.club
                                 case "领导力":
                                     mode = ClubKitPlanType.LEADERSHIP;
                                     break;
+                                case "生命":
+                                case "血量":
+                                    mode = ClubKitPlanType.MAX_HP;
+                                    break;
+                                case "攻击":
+                                    mode = ClubKitPlanType.ATTACK;
+                                    break;
+                                case "防御":
+                                    mode = ClubKitPlanType.DEFENSE;
+                                    break;
+                                case "追击":
+                                    mode = ClubKitPlanType.COMBO;
+                                    break;
+                                case "艺术":
+                                    mode = ClubKitPlanType.CHARISMA;
+                                    break;
+                                case "文化":
+                                    mode = ClubKitPlanType.WIT;
+                                    break;
+                                case "信仰":
+                                    mode = ClubKitPlanType.LUCK;
+                                    break;
+                                case "人气":
+                                    mode = ClubKitPlanType.POPULARITY;
+                                    break;
+                                case "科技":
+                                    mode = ClubKitPlanType.KNOWLEDGE;
+                                    break;
+                                case "五维和":
+                                case "五维总和":
+                                case "五维总计":
+                                    mode = ClubKitPlanType.FIVE;
+                                    break;
                                 default:
                                     mode = ClubKitPlanType.SONCOMBAT;
                                     break;
@@ -69,13 +102,10 @@ namespace RS.Snail.JJJ.robot.cmd.club
                     if (msg.Scene == ChatScene.Private) return;
                     else
                     {
-                        var group = _context.ContactsM.FindGroup(msg.Self, msg.Sender);
+                        var group = _context.ContactsM.FindGroup(msg.RoomID);
                         if (group is null)
                         {
-                            _context.WechatM.SendAtText($"⚠️唧唧叽缺少当前微信群的资料，请联系超管使用命令\"刷新群信息\"。",
-                                                        new List<string> { msg.WXID },
-                                                        msg.Self,
-                                                        msg.Sender);
+                            _context.WechatM.SendAtText($"⚠️唧唧叽缺少当前微信群的资料，请联系超管使用命令\"刷新群信息\"。", new List<string> { msg.Sender }, msg.RoomID);
                             return;
                         }
                         rid = group.RID;
@@ -85,23 +115,17 @@ namespace RS.Snail.JJJ.robot.cmd.club
                 if (string.IsNullOrEmpty(rid)) return;
 
                 // 检查本俱乐部权限
-                if (!_context.ContactsM.CheckGroupRole(msg.Self, rid, msg.WXID, msg.Scene == ChatScene.Group ? msg.Sender : ""))
+                if (_context.ContactsM.QueryRole(msg.Sender, rid: rid) < MinRole)
                 {
-                    _context.WechatM.SendAtText($"不可以查看其他俱乐部的信息。",
-                                             new List<string> { msg.WXID },
-                                             msg.Self,
-                                             msg.Sender);
+                    _context.WechatM.SendAtText($"您没有查看该俱乐部相关信息的权限。", new List<string> { msg.Sender }, msg.RoomID);
                     return;
                 }
 
                 // 找到俱乐部
-                var club = _context.ClubsM.FindClub(msg.Self, rid);
+                var club = _context.ClubsM.FindClub(rid);
                 if (club is null)
                 {
-                    _context.WechatM.SendAtText($"⚠️要查询的俱乐部[{rid}]不存在。",
-                                                new List<string> { msg.WXID },
-                                                msg.Self,
-                                                msg.Sender);
+                    _context.WechatM.SendAtText($"⚠️要查询的俱乐部[{rid}]不存在。", new List<string> { msg.Sender }, msg.RoomID);
                     return;
                 }
 
@@ -111,14 +135,11 @@ namespace RS.Snail.JJJ.robot.cmd.club
                 var desc = $"已将俱乐部[{club.Name}]的套装分配模式设置为[{include.club.ClubKitPlanTypeDesc(mode)}]\n" +
                            $"通常是每周五通过\"生成布阵图\"指令分配套装\n" +
                            $"若该俱乐部周五未分配套装，则之后的物种周内允许重新分配一次";
-                _context.WechatM.SendAtText(desc,
-                                          new List<string> { msg.WXID },
-                                          msg.Self,
-                                          msg.Sender);
+                _context.WechatM.SendAtText(desc, new List<string> { msg.Sender }, msg.RoomID);
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, Tag);
+                Context.Logger.WriteException(ex, Tag);
             }
         }
     }

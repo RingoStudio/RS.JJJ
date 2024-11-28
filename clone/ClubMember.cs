@@ -18,25 +18,22 @@ namespace RS.Snail.JJJ.clone
         {
             _context = context;
             RID = JSONHelper.ParseString(dbase["rid"]);
-            RobotWxid = JSONHelper.ParseString(dbase["robot_wxid"]);
             Name = CryptoHelper.DecryptBase64(JSONHelper.ParseString(dbase["name"]));
             Resume = JSONHelper.ParseStringList(dbase["resume"]);
             UpdateTime = JSONHelper.ParseLong(dbase["update_time"]);
         }
 
-        public ClubMember(Context context, string rid, string name, string robotWxid) : base(context, new JObject())
+        public ClubMember(Context context, string rid, string name) : base(context, new JObject())
         {
             _context = context;
             RID = rid;
             Name = name;
-            RobotWxid = robotWxid;
         }
         #endregion
 
         #region PUBLIC FIELDS
         public string RID { get; private set; }
         public string Name { get; private set; }
-        public string RobotWxid { get; private set; }
         public List<string> Resume { get; set; } = new List<string>();
         public long UpdateTime { get; private set; }
 
@@ -75,8 +72,10 @@ namespace RS.Snail.JJJ.clone
             if (data is not JObject || JSONHelper.GetCount(data) <= 0) return;
             var now = TimeHelper.ToTimeStamp();
             if (!IsWeekUpdated()) Replace(new JObject());
+
             if (isGW) Set("gw", data);
             else Absorb(data);
+
             Name = CryptoHelper.DecryptBase64(JSONHelper.ParseString(Query("nickname")));
             this.UpdateTime = now;
         }
@@ -86,7 +85,6 @@ namespace RS.Snail.JJJ.clone
             return JObject.FromObject(new
             {
                 name = CryptoHelper.EncryptBase64(Name),
-                robot_wxid = RobotWxid,
                 rid = RID,
                 resume = Resume,
                 dbase = dbase,
@@ -100,7 +98,7 @@ namespace RS.Snail.JJJ.clone
             if (string.IsNullOrEmpty(RID)) Resume.Add($"[{timeDesc}]离开原俱乐部");
             else
             {
-                var club = _context.ClubsM.FindClub(RobotWxid, newRID);
+                var club = _context.ClubsM.FindClub(newRID);
                 var name = "";
                 if (club is not null) name = club.Name;
                 if (string.IsNullOrEmpty(name)) name = newRID;

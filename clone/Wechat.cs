@@ -19,6 +19,7 @@ namespace RS.Snail.JJJ.clone
         public List<string> NoResponseGroups { get; private set; }
         public string OurName { get; private set; }
         public bool IsActived { get; set; }
+       
         #endregion
 
         #region INIT

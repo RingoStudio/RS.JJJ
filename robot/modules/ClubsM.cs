@@ -7,6 +7,7 @@ using Org.BouncyCastle.Ocsp;
 using RS.Snail.JJJ.boot;
 using RS.Snail.JJJ.Client.core.game.clone;
 using RS.Snail.JJJ.Client.core.game.include;
+using RS.Snail.JJJ.Client.core.game.module;
 using RS.Snail.JJJ.clone;
 using RS.Snail.JJJ.robot.cmd.misc;
 using RS.Snail.JJJ.robot.include;
@@ -40,8 +41,8 @@ namespace RS.Snail.JJJ.robot.modules
         private bool _inited = false;
         public bool Inited { get => _inited; }
 
-        private ConcurrentDictionary<string, ConcurrentDictionary<string, Club>> _clubs;
-        private ConcurrentDictionary<string, ConcurrentDictionary<string, ClubMember>> _clubMembers;
+        private ConcurrentDictionary<string, Club> _clubs;
+        private ConcurrentDictionary<string, ClubMember> _clubMembers;
         #endregion
 
         #region INIT
@@ -78,18 +79,12 @@ namespace RS.Snail.JJJ.robot.modules
                 _clubs = new();
                 foreach (var item in data)
                 {
-                    var wechatWxid = item.Name;
-                    _clubs.TryAdd(wechatWxid, new ConcurrentDictionary<string, Club>());
-                    var sub = item.Value;
-                    foreach (var subItem in sub)
-                    {
-                        _clubs[wechatWxid].TryAdd(subItem.Name, new Club(_context, subItem.Value));
-                    }
+                    _clubs.TryAdd(item.Name, new Club(_context, item.Value));
                 }
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, $"ClubsM.LoadCSV.CLUBS");
+                Context.Logger.WriteException(ex, $"ClubsM.LoadCSV.CLUBS");
             }
             #endregion
 
@@ -100,18 +95,12 @@ namespace RS.Snail.JJJ.robot.modules
                 _clubMembers = new();
                 foreach (var item in data)
                 {
-                    var wechatWxid = item.Name;
-                    _clubMembers.TryAdd(wechatWxid, new ConcurrentDictionary<string, ClubMember>());
-                    var sub = item.Value;
-                    foreach (var subItem in sub)
-                    {
-                        _clubMembers[wechatWxid].TryAdd(subItem.Name, new ClubMember(_context, subItem.Value));
-                    }
+                    _clubMembers.TryAdd(item.Name, new ClubMember(_context, item.Value));
                 }
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, $"ClubsM.LoadCSV.MEMBERS");
+                Context.Logger.WriteException(ex, $"ClubsM.LoadCSV.MEMBERS");
             }
             #endregion
         }
@@ -126,11 +115,7 @@ namespace RS.Snail.JJJ.robot.modules
                 jo = new JObject();
                 foreach (var item in _clubs)
                 {
-                    jo[item.Key] = jo[item.Key] ?? new JObject();
-                    foreach (var item2 in item.Value)
-                    {
-                        jo[item.Key][item2.Key] = item2.Value.GetJO();
-                    }
+                    jo[item.Key] = item.Value.GetJO();
                 }
                 IOHelper.SaveCSV(RS.Tools.Common.Enums.CSVType.RobotData, jo, include.files.Club_Data_CSV);
 
@@ -138,7 +123,7 @@ namespace RS.Snail.JJJ.robot.modules
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, "ClubsM.SaveCSV.Clubs");
+                Context.Logger.WriteException(ex, "ClubsM.SaveCSV.Clubs");
             }
 
             try
@@ -146,92 +131,89 @@ namespace RS.Snail.JJJ.robot.modules
                 jo = new JObject();
                 foreach (var item in _clubMembers)
                 {
-                    jo[item.Key] = jo[item.Key] ?? new JObject();
-                    foreach (var item2 in item.Value)
-                    {
-                        jo[item.Key][item2.Key] = item2.Value.GetJO();
-                    }
+                    jo[item.Key] = item.Value.GetJO();
                 }
                 IOHelper.SaveCSV(RS.Tools.Common.Enums.CSVType.RobotData, jo, include.files.Club_Members_CSV);
                 Console.WriteLine(">> 已保存 ClubMembers");
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, "ClubsM.SaveCSV.ClubMembers");
+                Context.Logger.WriteException(ex, "ClubsM.SaveCSV.ClubMembers");
             }
         }
         #endregion
 
         #region PUBLIC METHODS
+        public bool IsClubGroupBinded(string rid)
+        {
+            var club = FindClub(rid);
+            if (club is null) return false;
+            var group = _context.ContactsM.FindGroupByRID(rid);
+            if (group is null) return false;
+            return true;
+        }
         /// <summary>
         /// 查找俱乐部
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <returns></returns>
-        public Club? FindClub(string robotWxid, string rid)
+        public Club? FindClub(string rid)
         {
-            if (!_clubs.ContainsKey(robotWxid)) return null;
-            if (!_clubs[robotWxid].ContainsKey(rid)) return null;
-            return _clubs[robotWxid][rid];
+            if (!_clubs.ContainsKey(rid)) return null;
+            return _clubs[rid];
         }
         /// <summary>
         /// 查找游戏角色
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="uid"></param>
         /// <returns></returns>
-        public ClubMember? FindMember(string robotWxid, string uid)
+        public ClubMember? FindMember(string uid)
         {
-            if (!_clubMembers.ContainsKey(robotWxid)) return null;
-            if (!_clubMembers[robotWxid].ContainsKey(uid)) return null;
-            return _clubMembers[robotWxid][uid];
+            if (!_clubMembers.ContainsKey(uid)) return null;
+            return _clubMembers[uid];
         }
         /// <summary>
         ///  查找俱乐部成员昵称
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="uid"></param>
         /// <returns></returns>
-        public string? QueryMemberName(string robotWxid, string uid)
+        public string? QueryMemberName(string uid)
         {
-            var member = FindMember(robotWxid, uid);
+            var member = FindMember(uid);
             if (member is null) return null;
             return member.NameOrUID();
         }
         /// <summary>
         ///  查找俱乐部名称
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <returns></returns>
-        public string? QueryClubName(string robotWxid, string rid)
+        public string? QueryClubName(string rid)
         {
-            var club = FindClub(robotWxid, rid);
+            var club = FindClub(rid);
             if (club is null) return null;
             return club.Name;
         }
         /// <summary>
         /// 查看俱乐部信息
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <returns></returns>
-        public string? QueryClubInfo(string robotWxid, string rid, bool isPrivate = false)
+        public string? QueryClubInfo(string rid, bool isPrivate = false)
         {
-            var club = FindClub(robotWxid, rid);
+            var club = FindClub(rid);
             if (club is null) return null;
 
             var ret = new List<string>();
             ret.Add($"绑定俱乐部: {club.Name} [{club.RID}]");
 
-            var group = _context.ContactsM.FindGroupByRID(robotWxid, rid);
+            var group = _context.ContactsM.FindGroupByRID(rid);
             if (group is not null)
             {
                 // 会长
-                var holder = _context.ContactsM.QueryClubHolder(robotWxid, rid);
+                var holder = _context.ContactsM.QueryClubHolderWXID(rid);
                 if (string.IsNullOrEmpty(holder)) ret.Add($"会长: (空缺)");
-                else ret.Add($"会长: {_context.ContactsM.QueryGroupMemberNick(holder, robotWxid, group.WXID)}");
+                else ret.Add($"会长: {_context.ContactsM.QueryGroupMemberNick(holder, group.WXID)}");
 
                 // 经理
                 var managers = new List<string>();
@@ -256,7 +238,7 @@ namespace RS.Snail.JJJ.robot.modules
                 }
 
 
-                if (managers.Count > 0) ret.Add($"经理({managers.Count}人): {string.Join(", ", managers.Select((a) => _context.ContactsM.QueryGroupMemberNick(a, robotWxid, group.WXID)))}");
+                if (managers.Count > 0) ret.Add($"经理({managers.Count}人): {string.Join(", ", managers.Select((a) => _context.ContactsM.QueryGroupMemberNick(a, group.WXID)))}");
                 else ret.Add($"经理: (空缺)");
 
                 // uid count
@@ -264,12 +246,31 @@ namespace RS.Snail.JJJ.robot.modules
             }
 
             ret.Add("");
-            ret.Add($"俱乐部套装分配模式: {include.club.ClubKitPlanTypeDesc(club.ClubKitPlanType)}");
+            ret.Add($"俱乐部套装分配模式: {include.club.ClubKitPlanTypeDesc(club.ClubKitPlanType == ClubKitPlanType.UNDEFINED ? ClubKitPlanType.SONCOMBAT : club.ClubKitPlanType)}");
             ret.Add($"提醒内容模式: {(club.RemindContentNotCombine ? "分别@" : "合并@")}");
-            ret.Add($"登录后自动提醒: {(club.RemindAfterLogin ? "开启" : "关闭")}");
-            ret.Add($"登录后提醒物种历史: {(club.RemindContentContainsGroupWarHistory ? "开启" : "关闭")}");
             ret.Add($"提醒群成员变动: {(club.DontRemindGroupMemberChanged ? "关闭" : "开启")}");
             ret.Add($"提醒俱乐部成员变动: {(club.DontRemindClubMemberChanged ? "关闭" : "开启")}");
+            ret.Add("");
+
+            ret.Add($"参与自动登录: {(club.LoginAuto ? "开启" : "关闭")}");
+            if (club.AutoLoginSheetApplied)
+            {
+                ret.Add("自动登录模式: 自定义时间登录(按自动登录配置表)");
+                ret.Add($"登录后自动提醒: {(club.RemindAfterLogin ? "开启" : "关闭")}");
+                ret.Add(club.GetAutoLoginConfigsDesc());
+                ret.Add($"手动登录后自动提醒物种历史: {(club.RemindContentContainsGroupWarHistory ? "开启" : "关闭")}");
+                ret.Add($"手动登录后自动提醒挖矿: {(club.DontRemindMine ? "关闭" : "开启")}");
+                ret.Add($"手动登录后自动提醒金银牌: {(club.DontRemindTokens ? "关闭" : "开启")}");
+            }
+            else
+            {
+                ret.Add("自动登录模式: 固定时间登录(每日12:30/18:00/20:00)");
+                ret.Add($"登录后自动提醒: {(club.RemindAfterLogin ? "开启" : "关闭")}");
+                ret.Add($"登录后提醒物种历史: {(club.RemindContentContainsGroupWarHistory ? "开启" : "关闭")}");
+                ret.Add($"登录后提醒挖矿: {(club.DontRemindMine ? "关闭" : "开启")}");
+                ret.Add($"登录后提醒金银牌: {(club.DontRemindTokens ? "关闭" : "开启")}");
+            }
+
 
             if (club.LoginSimpleMode) ret.Add($"简易登录模式: 开启");
             if (isPrivate)
@@ -302,69 +303,78 @@ namespace RS.Snail.JJJ.robot.modules
             return string.Join("\n", ret);
         }
         /// <summary>
-        /// 处理登陆后的数据
+        /// 处理登录后的数据
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <param name="data"></param>
-        public void LoadLoginData(string robotWxid, string rid, dynamic data)
+        public void LoadLoginData(string rid, dynamic data)
         {
             if (data is not JObject || JSONHelper.GetCount(data) == 0) return;
 
             var members = data.members ?? new JObject();
-            // if (!_clubMembers.ContainsKey(robotWxid)) _clubMembers.TryAdd(robotWxid, new());
+            // if (!_clubMembers.ContainsKey(robotWxid)) _clubMembers.TryAdd( new());
             foreach (var item in members)
             {
                 string uid = item.Name;
                 var memberData = item.Value;
                 var memberName = JSONHelper.ParseString(memberData.nickname);
-                if (!_clubMembers[robotWxid].ContainsKey(uid)) _clubMembers[robotWxid][uid] = new ClubMember(_context, uid, memberName, robotWxid);
-                _clubMembers[robotWxid][uid].UpdateData(memberData);
+                if (!_clubMembers.ContainsKey(uid)) _clubMembers[uid] = new ClubMember(_context, uid, memberName);
+                _clubMembers[uid].UpdateData(memberData);
             }
 
             // 更新俱乐部信息
             var club = data.club;
             if (club is not null)
             {
-                //if (!_clubs.ContainsKey(robotWxid)) _clubs.TryAdd(robotWxid, new());
-                /*if (_clubs[robotWxid].ContainsKey(rid))*/
-                _clubs[robotWxid][rid].UpdateData(club);
+                //if (!_clubs.ContainsKey(robotWxid)) _clubs.TryAdd( new());
+                /*if (_clubs.ContainsKey(rid))*/
+                _clubs[rid].UpdateData(club);
                 List<string> uids = JSONHelper.GetKeys(members);
                 if (uids.Count > 0)
                 {
-                    var memberChange = _clubs[robotWxid][rid].UpdateMembers(uids);
-                    foreach (var uid in memberChange.newMembers) ClubMemberChangeClub(robotWxid, uid, rid);
-                    foreach (var uid in memberChange.removedMembers) ClubMemberChangeClub(robotWxid, uid, "");
+                    var memberChange = _clubs[rid].UpdateMembers(uids);
+                    foreach (var uid in memberChange.newMembers) ClubMemberChangeClub(uid, rid);
+                    foreach (var uid in memberChange.removedMembers) ClubMemberChangeClub(uid, "");
 
                     // 提醒成员变动
-                    if (!_clubs[robotWxid][rid].DontRemindClubMemberChanged)
+                    if (!_clubs[rid].DontRemindClubMemberChanged)
                     {
                         var remindList = new List<string>();
                         if (memberChange.removedMembers.Count > 0)
                         {
                             remindList.Add($"发现以下 {memberChange.removedMembers} 个成员退出本俱乐部");
-                            remindList.AddRange(memberChange.removedMembers.Select(a => QueryMemberName(robotWxid, a) ?? a));
+                            remindList.AddRange(memberChange.removedMembers.Select(a => QueryMemberName(a) ?? a));
                         }
                         if (memberChange.newMembers.Count > 0)
                         {
                             remindList.Add($"发现以下 {memberChange.newMembers.Count} 个成员新加入本俱乐部");
-                            remindList.AddRange(memberChange.newMembers.Select(a => QueryMemberName(robotWxid, a) ?? a));
+                            remindList.AddRange(memberChange.newMembers.Select(a => QueryMemberName(a) ?? a));
                         }
 
                         if (remindList.Count > 0)
                         {
                             var msg = string.Join("\n", remindList);
-                            var group = _context.ContactsM.FindGroupByRID(robotWxid, rid);
+                            var group = _context.ContactsM.FindGroupByRID(rid);
                             if (group is not null)
                             {
-                                var holder = _context.ContactsM.QueryClubHolder(robotWxid, rid);
-                                if (_clubs[robotWxid][rid].LoginDontAtHolder || string.IsNullOrEmpty(holder))
+                                var holder = _context.ContactsM.QueryClubHolderWXID(rid);
+                                if (msg.Length > 300)
                                 {
-                                    _context.WechatM.SendText(msg, robotWxid, group.WXID);
+                                    var fileName = $"OUT\\俱乐部成员变动通知_{group.Name}_{DateTime.Now.ToString("yyyy_MM_dd_HH_mm_ss")}.txt";
+                                    fileName = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, fileName);
+                                    System.IO.File.WriteAllText(fileName, msg);
+                                    _context.WechatM.SendFile(fileName, group.WXID);
                                 }
                                 else
                                 {
-                                    _context.WechatM.SendAtText(msg, new List<string> { holder }, robotWxid, group.WXID);
+                                    if (_clubs[rid].LoginDontAtHolder || string.IsNullOrEmpty(holder))
+                                    {
+                                        _context.WechatM.SendText(msg, group.WXID);
+                                    }
+                                    else
+                                    {
+                                        _context.WechatM.SendAtText(msg, new List<string> { holder }, group.WXID);
+                                    }
                                 }
                             }
                         }
@@ -380,51 +390,66 @@ namespace RS.Snail.JJJ.robot.modules
                 var events = gw.events;
                 if (events is JObject)
                 {
-                    _context.GroupWarEventsM.Update(events, robotWxid, _clubs[robotWxid][rid].ChannelType, _clubs[robotWxid][rid].CombinedDistSort, _clubs[robotWxid][rid].GroupwarEventShareKey);
-                    _clubs[robotWxid][rid].UpdateGWEvents(events);
+                    _context.GroupWarEventsM.Update(events, _clubs[rid].ChannelType, _clubs[rid].CombinedDistSort, _clubs[rid].GroupwarEventShareKey);
+                    _clubs[rid].UpdateGWEvents(events);
                 }
-                _clubs[robotWxid][rid].UpdateGWData(gw.club ?? new JObject());
-                var memberGW = data.members ?? new JObject();
+                _clubs[rid].UpdateGWData(gw.club ?? new JObject());
+                var memberGW = gw.members ?? new JObject();
                 foreach (var item in memberGW)
                 {
                     string uid = item.Name;
                     var memberGWData = item.Value;
-                    _clubMembers[robotWxid][uid].UpdateData(memberGWData, true);
+                    _clubMembers[uid].UpdateData(memberGWData, true);
                 }
             }
+        }
+        public List<string> GetLoginRIDsWithConfigSheet(bool isAuto = false)
+        {
+            var ret = new List<string>();
+            foreach (var item in _clubs)
+            {
+                if (item.Value.AccountPasswords is null || item.Value.AccountPasswords.Count <= 0) continue;
+                if (!item.Value.IsPurchased()) continue;
+                if (isAuto && !item.Value.LoginAuto) continue;
+                if (!item.Value.AutoLoginSheetApplied) continue;
+                var group = _context.ContactsM.FindGroupByRID(item.Key);
+                if (group is null) continue;
+                ret.Add(item.Key);
+            }
+            ret.Sort((a, b) => _clubs[b].LoginSort - _clubs[a].LoginSort);
+
+            return ret;
         }
         /// <summary>
         /// 获取所有参与自动登录的俱乐部RID
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <returns></returns>
-        public List<string> GetLoginRIDs(string robotWxid, bool isAuto = false)
+        public List<string> GetLoginRIDsWithoutConfigSheet(bool isAuto = false)
         {
             var ret = new List<string>();
-            if (!_clubs.ContainsKey(robotWxid)) return ret;
-            foreach (var item in _clubs[robotWxid])
+            foreach (var item in _clubs)
             {
-                if (item.Value.AccountPasswords.Count <= 0) continue;
+                if (item.Value.AccountPasswords is null || item.Value.AccountPasswords.Count <= 0) continue;
                 if (!item.Value.IsPurchased()) continue;
                 if (isAuto && !item.Value.LoginAuto) continue;
-                var group = _context.ContactsM.FindGroupByRID(robotWxid, item.Key);
+                if (item.Value.AutoLoginSheetApplied) continue;
+                var group = _context.ContactsM.FindGroupByRID(item.Key);
                 if (group is null) continue;
                 ret.Add(item.Key);
             }
-            ret.Sort((a, b) => _clubs[robotWxid][b].LoginSort - _clubs[robotWxid][a].LoginSort);
+            ret.Sort((a, b) => _clubs[b].LoginSort - _clubs[a].LoginSort);
 
             return ret;
         }
         /// <summary>
         /// 查找俱乐部成员的WXID
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <param name="uid"></param>
         /// <returns></returns>
-        public string? QueryMemberWxid(string robotWxid, string rid, string uid)
+        public string? QueryMemberWxid(string rid, string uid)
         {
-            var group = _context.ContactsM.FindGroupByRID(robotWxid, rid);
+            var group = _context.ContactsM.FindGroupByRID(rid);
             if (group is null) return null;
 
             foreach (var member in group.Members)
@@ -440,37 +465,34 @@ namespace RS.Snail.JJJ.robot.modules
         /// <summary>
         /// 增加俱乐部
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <param name="channelType"></param>
         /// <returns></returns>
-        public bool AddClub(string robotWxid, string rid, ChannelType channelType)
+        public bool AddClub(string rid, ChannelType channelType)
         {
             try
             {
-                if (!_clubs.ContainsKey(robotWxid)) return false;
-                if (_clubs[robotWxid].ContainsKey(rid)) return false;
-                var club = new Club(_context, robotWxid, rid, channelType);
-                _clubs[robotWxid].TryAdd(rid, club);
+                if (_clubs.ContainsKey(rid)) return false;
+                var club = new Club(_context, rid, channelType);
+                _clubs.TryAdd(rid, club);
                 return true;
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, "ClubsM.AddClub");
+                Context.Logger.WriteException(ex, "ClubsM.AddClub");
             }
             return false;
         }
         /// <summary>
         /// 移除俱乐部
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <returns></returns>
-        public bool DelClub(string robotWxid, string rid)
+        public bool DelClub(string rid)
         {
             try
             {
-                var club = FindClub(robotWxid, rid);
+                var club = FindClub(rid);
                 if (club is null) return false;
 
                 // 停止登录
@@ -480,53 +502,120 @@ namespace RS.Snail.JJJ.robot.modules
                 var uids = club.Members;
                 foreach (var uid in uids)
                 {
-                    ClubMemberChangeClub(robotWxid, uid, "");
+                    ClubMemberChangeClub(uid, "");
                 }
 
-                _clubs[robotWxid].Remove(rid, out _);
+                _clubs.Remove(rid, out _);
                 return true;
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, "ClubsM.AddClub");
+                Context.Logger.WriteException(ex, "ClubsM.DelClub");
             }
             return false;
         }
-        public bool AddClubLoginAccount(string robotWxid, string rid, string account, string password)
+        public bool AddClubLoginAccount(string rid, string account, string password)
         {
             if (string.IsNullOrEmpty(account) || string.IsNullOrEmpty(password)) return false;
-            var club = FindClub(robotWxid, rid);
+            var club = FindClub(rid);
             if (club is null) return false;
 
+            club.AccountPasswords = club.AccountPasswords ?? new();
             club.AccountPasswords[account] = password;
             return true;
         }
         /// <summary>
         /// 移除俱乐部登录账号
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <param name="account"></param>
         /// <returns></returns>
-        public (bool result, string? desc) DelClubLoginAccount(string robotWxid, string rid, string account = "")
+        public (bool result, string? desc) DelClubLoginAccount(string rid, string account = "")
         {
-            var club = FindClub(robotWxid, rid);
+            var club = FindClub(rid);
             if (club is null) return (false, $"没有找到俱乐部[{rid}]");
 
             if (!string.IsNullOrEmpty(account))
             {
                 if (!club.AccountPasswords.ContainsKey(account)) return (false, $"俱乐部[{club.Name} {rid}]没有这个登录账号");
                 club.AccountPasswords.Remove(account);
-                return (true, $"已成功移除[{club.Name} {rid}]登陆账号 {StringHelper.GetMixedPhoneNumber(account)}");
+                return (true, $"已成功移除[{club.Name} {rid}]登录账号 {StringHelper.GetMixedPhoneNumber(account)}");
             }
 
             else
             {
                 var count = club.AccountPasswords.Count;
                 club.AccountPasswords.Clear();
-                return (true, $"已成功移除[{club.Name} {rid}]的 {count} 个登陆账号");
+                return (true, $"已成功移除[{club.Name} {rid}]的 {count} 个登录账号");
             }
 
+        }
+
+        public (bool result, string? desc) SetClubAutoLoginConfigSheet(string path, string rid)
+        {
+            var group = FindClub(rid);
+            if (group is null) return (false, "未找到俱乐部。");
+            if (!System.IO.File.Exists(path)) return (false, "配置文件未接收成功。");
+            var checkTime = new Func<string, bool>(_time =>
+            {
+                var arr = _time.Split(":");
+                if (arr.Length < 2) return false;
+                foreach (var _item in arr)
+                {
+                    if (!StringHelper.IsInt(_item)) return false;
+                }
+                int hour = Convert.ToInt32(arr[0]), min = Convert.ToInt32(arr[1]), sec = arr.Length > 2 ? Convert.ToInt32(arr[2]) : 0;
+                return hour >= 0 && hour <= 24 & min >= 0 && min <= 59 && sec >= 0 && sec <= 59;
+            });
+            var getWeekday = new Func<int, int>(_index => _index switch
+            {
+                0 or 1 or 2 => 6,
+                3 or 4 or 5 => 7,
+                6 or 7 or 8 => 1,
+                9 or 10 or 11 => 2,
+                12 or 13 or 14 => 3,
+                15 or 16 or 17 => 4,
+                18 => 5,
+                _ => 0
+            });
+            try
+            {
+                var data = RS.Tools.Excel.ExcelHelper.ReadFistWorksheet(path, 4, 3, 19, 6);
+                int cnt = 0;
+                List<dynamic> list = new List<dynamic>();
+
+                for (int i = 0; i < data.Count; i++)
+                {
+                    if (!checkTime(data[i][0])) continue;
+                    dynamic jo = new JObject();
+                    var weekday = getWeekday(i);
+                    jo.weekday = weekday;
+                    jo.index = (i % 3) + 1;
+                    jo.time = data[i][0];
+                    jo.isEnable = data[i][1] == "Y";
+                    jo.remindTokens = data[i][2] == "Y" && weekday != 5;
+                    jo.remindMines = data[i][3] == "Y" && weekday != 5;
+                    jo.remindDrills = data[i][4] == "Y" && weekday != 5;
+                    jo.remindGW = data[i][5] == "Y" && weekday != 5;
+                    cnt++;
+                    list.Add(jo);
+                }
+
+                if (cnt > 0)
+                {
+                    group.AutoLoginConfigs = new();
+                    foreach (var item in list) group.AutoLoginConfigs.Add(new(item));
+                    group.AutoLoginSheetApplied = true;
+                    _context.SnailsM.RegistOneClubAutoLoginSchedule(rid);
+                    return (true, $"已成功更新{group.Name}[{rid}]的{cnt}条自动登录配置");
+                }
+                else return (false, "传入的配置表中没有识别出任何有效的登录配置，操作失败！");
+            }
+            catch (Exception ex)
+            {
+
+                throw;
+            }
         }
         #endregion
 
@@ -534,12 +623,11 @@ namespace RS.Snail.JJJ.robot.modules
         /// <summary>
         /// 俱乐部成员变更俱乐部
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="uid"></param>
         /// <param name="newRid"></param>
-        public void ClubMemberChangeClub(string robotWxid, string uid, string newRid = "")
+        public void ClubMemberChangeClub(string uid, string newRid = "")
         {
-            var member = FindMember(robotWxid, uid);
+            var member = FindMember(uid);
             member?.ChangeClubRID(newRid);
         }
         #endregion
@@ -548,14 +636,12 @@ namespace RS.Snail.JJJ.robot.modules
         /// <summary>
         /// 获取俱乐部列表
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <returns></returns>
-        public string GetClubListExcel(string robotWxid)
+        public string GetClubListExcel()
         {
             try
             {
-                if (!_clubs.ContainsKey(robotWxid)) return "";
-                var fileName = $"OUT\\{ExcelHelper.GetFileName("俱乐部名单")}";
+                var fileName = $"OUT\\{ExcelHelper.GetFileName(include.files.File_ClubStatements)}";
                 var content = new List<List<string>>
                                     {
                                         new List<string>
@@ -563,13 +649,16 @@ namespace RS.Snail.JJJ.robot.modules
                                             "RID",
                                             "名称",
                                             "渠道",
+                                            "绑定微信群",
                                             "登录账号数量",
                                             "登录顺序(Z-A)",
                                             "成员数量",
                                             "上一次登录",
                                             "提醒内容合并",
-                                            "登陆后自动提醒",
+                                            "登录后自动提醒",
                                             "自动提醒包括物种历史",
+                                            "自动提醒包括挖矿",
+                                            "自动提醒包括金银牌",
                                             "物种事件共享密钥",
                                             "简易登录模式",
                                             "套装分配模式",
@@ -582,13 +671,14 @@ namespace RS.Snail.JJJ.robot.modules
                                         },
                                     };
 
-                foreach (var club in _clubs[robotWxid].Values)
+                foreach (var club in _clubs.Values)
                 {
                     content.Add(new List<string>
                     {
                         club.RID,
                         club.Name,
                         include.club.ChannelTypeDesc(club.ChannelType),
+                        _context.ContactsM.FindGroupByRID(club.RID)?.Name??"未绑定",
                         club.AccountPasswords.Count.ToString(),
                         club.LoginSort.ToString(),
                         $"{club.Members.Count}",
@@ -596,9 +686,11 @@ namespace RS.Snail.JJJ.robot.modules
                         club.RemindContentNotCombine ? "关闭":"开启",
                         club.RemindAfterLogin ? "开启":"关闭",
                         club.RemindContentContainsGroupWarHistory ? "开启":"关闭",
+                        club.DontRemindMine? "关闭":"开启",
+                        club.DontRemindTokens?  "关闭":"开启",
                         club.GroupwarEventShareKey ??"",
                         club.LoginSimpleMode?"开启":"关闭",
-                        include.club.ClubKitPlanTypeDesc(club.ClubKitPlanType),
+                        include.club.ClubKitPlanTypeDesc(club.ClubKitPlanType == ClubKitPlanType.UNDEFINED ? ClubKitPlanType.SONCOMBAT : club.ClubKitPlanType),
                         club.LoginDontAtHolder ? "关闭":"开启",
                         club.DistDesc,
                         club.CombinedDistSort.ToString(),
@@ -612,7 +704,7 @@ namespace RS.Snail.JJJ.robot.modules
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, "ClubsM.GetClubListExcel");
+                Context.Logger.WriteException(ex, "ClubsM.GetClubListExcel");
                 return "";
             }
         }
@@ -623,15 +715,14 @@ namespace RS.Snail.JJJ.robot.modules
         /// <summary>
         /// 查询物种总览EXCEL
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <returns></returns>
-        public string? QueryGroupWarHistoryExcel(string robotWxid, string rid)
+        public string? QueryGroupWarHistoryExcel(string rid)
         {
-            var club = FindClub(robotWxid, rid);
+            var club = FindClub(rid);
             if (club is null) return null;
 
-            var fileName = $"OUT\\{ExcelHelper.GetFileName($"物种总览_{club.Name}_{rid}")}";
+            var fileName = $"OUT\\{ExcelHelper.GetFileName($"{include.files.File_GroupWarStatements}_{club.Name}_{rid}")}";
             var now = TimeHelper.ToTimeStamp();
 
             try
@@ -643,7 +734,20 @@ namespace RS.Snail.JJJ.robot.modules
                                     "昵称",
                                     "战力",
                                     "领导力",
-                                    "兵演战力",
+                                    "演练实力",
+
+                                    "生命",
+                                    "攻击",
+                                    "防御",
+                                    "追击",
+
+                                    "艺术",
+                                    "文化",
+                                    "信仰",
+                                    "人气",
+                                    "科技",
+                                    "五维总和",
+
                                     "实际套装",
                                     "指定套装",
                                     "物种分数",
@@ -674,7 +778,7 @@ namespace RS.Snail.JJJ.robot.modules
                             "蜣螂得分",
                             "蜣螂伤害",
                             "蜣螂总计少打(次)",
-                            "蜣螂今日少打(次)",
+                            "蜣螂今日攻打(次)",
                         });
                         break;
                     case "2":
@@ -739,7 +843,7 @@ namespace RS.Snail.JJJ.robot.modules
 
                 foreach (var uid in club.Members)
                 {
-                    var member = FindMember(robotWxid, uid);
+                    var member = FindMember(uid);
                     if (member is null) continue;
 
                     var kit = include.club.KitDesc(member.Kit);
@@ -747,9 +851,9 @@ namespace RS.Snail.JJJ.robot.modules
                     if (kit != kitAlloc) kitAlloc = $"[red]{kitAlloc}";
 
                     var mineDest = JSONHelper.ParseLong(member.Query("mine_dest"));
-                    var mineDestStr = mineDest <= 0 ? "[red]不在矿中" : TimeHelper.ChineseTimeDescWithWeekday(mineDest);
+                    var mineDestStr = mineDest <= 1000000000 ? "[red]不在矿中" : TimeHelper.ChineseTimeDescWithWeekday(mineDest);
                     var mineRemain = "";
-                    if (mineDest <= 0) mineRemain = "[red]不在矿中";
+                    if (mineDest <= 1000000000) mineRemain = "[red]不在矿中";
                     else if (mineDest < now) mineRemain = $"[red]超时{TimeHelper.ChinsesTimeDurationDesc(now - mineDest)}";
                     else if (mineDest < now + 1800) mineRemain = "[yellow]" + TimeHelper.ChinsesTimeDurationDesc(mineDest - now);
                     else mineRemain = TimeHelper.ChinsesTimeDurationDesc(mineDest - now);
@@ -757,9 +861,9 @@ namespace RS.Snail.JJJ.robot.modules
                     var minePos = JSONHelper.ParseString(member.Query("mine_pos"));
                     if (string.IsNullOrEmpty(minePos)) minePos = "[red]不在矿中";
 
-                    var drill = JSONHelper.ParseInt(member.Query("drill"));
-                    var drillLack = JSONHelper.ParseInt(member.Query("drill_lack"));
-                    var drillLeft = JSONHelper.ParseInt(member.Query("drill_total")) - drill;
+                    int drill = JSONHelper.ParseInt(member.Query("drill"));
+                    int drillLack = JSONHelper.ParseInt(member.Query("drill_lack"));
+                    int drillLeft = JSONHelper.ParseInt(member.Query("drill_total")) - drill;
 
 
                     var gold = JSONHelper.ParseInt(member.Query("token_gold"));
@@ -768,10 +872,16 @@ namespace RS.Snail.JJJ.robot.modules
                     var goldLackTotal = JSONHelper.ParseInt(member.Query("token_gold_lack_total"));
 
                     var silver = JSONHelper.ParseInt(member.Query("token_silver"));
-                    var silverLeft = JSONHelper.ParseInt(member.Query("token_silver_total")) - gold;
+                    var silverLeft = JSONHelper.ParseInt(member.Query("token_silver_total")) - silver;
                     var silverLack = JSONHelper.ParseInt(member.Query("token_silver_lack_today"));
                     var silverLackTotal = JSONHelper.ParseInt(member.Query("token_silver_lack_total"));
 
+                    var five = new Dictionary<string, long>();
+
+                    foreach (var attrib in include.club.FiveAttribs)
+                    {
+                        five[attrib] = JSONHelper.ParseLong(member.Query(attrib));
+                    }
 
                     var line = new List<string> {
                         uid,
@@ -779,6 +889,19 @@ namespace RS.Snail.JJJ.robot.modules
                         JSONHelper.ParseLong(member.Query("combat")).ToString(),
                         JSONHelper.ParseInt(member.Query("leadership")).ToString(),
                         JSONHelper.ParseLong(member.Query("son_combat")).ToString(),
+
+                        JSONHelper.ParseLong(member.Query("max_hp")).ToString(),
+                        JSONHelper.ParseLong(member.Query("attack")).ToString(),
+                        JSONHelper.ParseLong(member.Query("defense")).ToString(),
+                        JSONHelper.ParseLong(member.Query("combo")).ToString(),
+
+                        five["charisma"].ToString(),
+                        five["wit"].ToString(),
+                        five["luck"].ToString(),
+                        five["popularity"].ToString(),
+                        five["knowledge"].ToString(),
+                        five.Values.Sum().ToString(),
+
                         kit,
                         kitAlloc,
                         JSONHelper.ParseInt(member.Query("score")).ToString(),
@@ -787,7 +910,7 @@ namespace RS.Snail.JJJ.robot.modules
                         minePos,
                         JSONHelper.ParseInt(member.Query("event_multi_count")).ToString(),
 
-                        $"{(drillLack>0?"[red]":"")}{drill}",
+                        drill.ToString(),
                         drillLeft.ToString(),
 
                         $"{(silverLack>0?"[red]":"")}{silverLack}",
@@ -802,7 +925,7 @@ namespace RS.Snail.JJJ.robot.modules
                         $"{(goldLeft>0?"[yellow]":"")}{goldLeft}",
                         JSONHelper.ParseInt(member.Query("token_gold_buy"))>0?"已氪":"未氪",
 
-                        $"{JSONHelper.ParseDouble(member.Query("mine_rate")):N2}%"
+                        $"{(JSONHelper.ParseDouble(member.Query("mine_rate"))*100):N2}%"
                     };
 
                     if (club.Map == "1")
@@ -810,14 +933,14 @@ namespace RS.Snail.JJJ.robot.modules
                         int todaySpe1 = JSONHelper.ParseInt(member.Query("gw/today_count"));
                         int lackSpe1 = JSONHelper.ParseInt(member.Query("gw/total_lack"));
                         int scoreSpe1 = JSONHelper.ParseInt(member.Query("gw/score"));
-                        int damageSpe1 = JSONHelper.ParseInt(member.Query("gw/damage"));
+                        long damageSpe1 = JSONHelper.ParseLong(member.Query("gw/damage"));
 
                         line.AddRange(new List<string>
                                 {
                                     scoreSpe1.ToString(),
                                     damageSpe1.ToString(),
                                     $"{(lackSpe1>0?"[red]":"")}{lackSpe1}",
-                                    $"{(todaySpe1>0?"[red]":"")}{todaySpe1}",
+                                    $"{(todaySpe1<1?"[red]":"")}{todaySpe1}",
                                 });
                     }
                     else if (club.Map == "2")
@@ -847,8 +970,10 @@ namespace RS.Snail.JJJ.robot.modules
                     else if (club.Map == "3")
                     {
                         bool isStarted = JSONHelper.ParseBool(member.Query("gw/is_started"));
-                        var todayStart = isStarted ? "[red]尚未开始" : TimeHelper.ChineseTimeDescWithWeekday(JSONHelper.ParseLong(member.Query("gw/start")));
-                        var todayTime = isStarted ? "[red]尚未开始" : TimeHelper.ChinsesTimeDurationDesc(JSONHelper.ParseLong(member.Query("gw/today_time")));
+                        var startTime = JSONHelper.ParseLong(member.Query("gw/start"));
+                        startTime = Math.Max(0, startTime);
+                        var todayStart = (!isStarted || startTime <= 0) ? "[red]尚未开始" : TimeHelper.ChineseTimeDescWithWeekday(startTime);
+                        var todayTime = (!isStarted || startTime <= 0) ? "[red]尚未开始" : TimeHelper.ChinsesTimeDurationDesc(JSONHelper.ParseLong(member.Query("gw/today_time")));
                         var late = "";
                         if (!isStarted) late = "[red]尚未开始";
                         else
@@ -859,12 +984,12 @@ namespace RS.Snail.JJJ.robot.modules
                         }
                         var totalTime = TimeHelper.ChinsesTimeDurationDesc(JSONHelper.ParseLong(member.Query("gw/total_time")));
                         var height = JSONHelper.ParseInt(member.Query("gw/height"));
-                        var costCount = JSONHelper.ParseInt(member.Query("gw/cost_count"));
-                        var todayLack = JSONHelper.ParseInt(member.Query("gw/lack_today"));
-                        var todayLeft = JSONHelper.ParseInt(member.Query("gw/not_use_today"));
-                        var totalLack = JSONHelper.ParseInt(member.Query("gw/lack"));
-                        var totalLeft = JSONHelper.ParseInt(member.Query("gw/not_use"));
-
+                        int costCount = JSONHelper.ParseInt(member.Query("gw/cost_count"));
+                        int todayLack = JSONHelper.ParseInt(member.Query(club.Spe3DontNeedBuyGem ? "gw/lack_today_not_buy" : "gw/lack_today"));
+                        int todayLeft = JSONHelper.ParseInt(member.Query("gw/not_use_today"));
+                        int totalLack = JSONHelper.ParseInt(member.Query(club.Spe3DontNeedBuyGem ? "gw/lack_not_buy" : "gw/lack"));
+                        int totalLeft = JSONHelper.ParseInt(member.Query("gw/not_use"));
+                        double speed = JSONHelper.ParseDouble(member.Query("gw/rate"));
 
                         line.AddRange(new List<string>
                                 {
@@ -873,6 +998,7 @@ namespace RS.Snail.JJJ.robot.modules
                                     late,
                                     totalTime,
                                     height.ToString(),
+                                    speed.ToString("0.00"),
                                     costCount.ToString(),
                                     $"{(todayLack>0?"[red]":"")}{todayLack}",
                                     $"{(todayLeft>0?"[red]":"")}{todayLeft}",
@@ -889,20 +1015,20 @@ namespace RS.Snail.JJJ.robot.modules
                         var dice = JSONHelper.ParseInt(member.Query("gw/dice"));
                         var redDice = JSONHelper.ParseInt(member.Query("gw/red_dice"));
                         var bigDealCount = JSONHelper.ParseInt(member.Query("gw/big_deal_count"));
-                        var supplyTime = isSupply ? TimeHelper.ChineseTimeDescWithWeekday(JSONHelper.ParseLong(member.Query("gw/big_deal_count"))) : "[red]今日未领取";
+                        var supplyTime = isSupply ? TimeHelper.ChineseTimeDescWithWeekday(JSONHelper.ParseLong(member.Query("gw/supply_time"))) : "[red]今日未领取";
                         var upGrid = JSONHelper.ParseInt(member.Query("gw/up_grid"));
                         var costDice = JSONHelper.ParseInt(member.Query("gw/cost_dice"));
                         var costRedDice = JSONHelper.ParseInt(member.Query("gw/cost_red_dice"));
                         line.AddRange(new List<string>
                                 {
-                                    chapter.ToString(),
-                                    dice.ToString(),
-                                    redDice.ToString(),
-                                    costDice.ToString(),
-                                    costRedDice.ToString(),
-                                    bigDealCount.ToString(),
+                                    chapter < 0 ? "N/A" : chapter.ToString(),
+                                    dice < 0 ? "N/A" : dice.ToString(),
+                                    redDice < 0 ? "N/A" : redDice.ToString(),
+                                    costDice < 0 ? "N/A" : costDice.ToString(),
+                                    costRedDice < 0 ? "N/A" : costRedDice.ToString(),
+                                    bigDealCount < 0 ? "N/A" : bigDealCount.ToString(),
                                     supplyTime,
-                                    upGrid.ToString(),
+                                    upGrid < 0 ? "N/A" : upGrid.ToString(),
                                     blockName,
                                 });
 
@@ -939,28 +1065,28 @@ namespace RS.Snail.JJJ.robot.modules
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, "ClubsM.QueryGroupWarHistoryExcel");
+                Context.Logger.WriteException(ex, "ClubsM.QueryGroupWarHistoryExcel");
                 return "";
             }
         }
+        private int[] GWSpe4AuctionWeekdays = new int[] { 7, 1, 2, 3 };
         /// <summary>
         /// 查询BOSS伤害总览
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <returns></returns>
-        public string QueryGroupWarBossCombatRecordExcel(string robotWxid, string rid)
+        public string QueryGroupWarBossCombatRecordExcel(string rid)
         {
-                  var club = FindClub(robotWxid, rid);
-                  if (club is null) return null;
-                  if (!club.IsWeekUpdated()) return null;
+            var club = FindClub(rid);
+            if (club is null) return null;
+            if (!club.IsWeekUpdated()) return null;
 
-                  var fileName = $"OUT\\{ExcelHelper.GetFileName($"BOSS伤害总览_{club.Name}_{rid}")}";
+            var fileName = $"OUT\\{ExcelHelper.GetFileName($"{include.files.File_BossDamageStatements}_{club.Name}_{rid}")}";
 
-                  try
-                  {
-                      var content = new List<List<string>>();
-                      var header = new List<string>
+            try
+            {
+                var content = new List<List<string>>();
+                var header = new List<string>
                                       {
                                         "区域",
                                         "UID",
@@ -968,47 +1094,45 @@ namespace RS.Snail.JJJ.robot.modules
                                         "伤害值",
                                       };
 
-                      content.Add(header);
+                content.Add(header);
 
-                      var data = club.CombatRecord ?? new JObject();
-                      // {<area>:{<uid>:{"damage":<damage>}, ...}, ...}
-                      foreach (var areaItem in data)
-                      {
-                          var area = areaItem.Name;
-                          var areaData = areaItem.Value;
-                          foreach (var memberItem in areaData)
-                          {
-                              var uid = memberItem.Name;
-                              var memberData = memberItem.Value;
-                              var damage = JSONHelper.ParseInt(memberData.damage);
+                var data = club.CombatRecord ?? new JObject();
+                // {<area>:{<uid>:{"damage":<damage>}, ...}, ...}
+                foreach (var areaItem in data)
+                {
+                    var area = areaItem.Name;
+                    var areaData = areaItem.Value;
+                    foreach (var memberItem in areaData)
+                    {
+                        var uid = memberItem.Name;
+                        var damage = JSONHelper.ParseLong(memberItem.Value);
 
-                              content.Add(new List<string>
+                        content.Add(new List<string>
                               {
                                 area,
                                 uid,
-                                QueryMemberName(robotWxid, uid),
+                                QueryMemberName(uid),
                                 damage.ToString(),
                               });
-                          }
-                      }
+                    }
+                }
 
-                      return ExcelHelper.SaveSingleWorksheet(content, fileName, "BOSS伤害总览");
-                  }
-                  catch (Exception ex)
-                  {
-                      Context.Logger.Write(ex, "ClubsM.QueryGroupWarBossCombatRecordExcel");
-                      return "";
-                  }
+                return ExcelHelper.SaveSingleWorksheet(content, fileName, "BOSS伤害总览");
+            }
+            catch (Exception ex)
+            {
+                Context.Logger.WriteException(ex, "ClubsM.QueryGroupWarBossCombatRecordExcel");
+                return "";
+            }
         }
         /// <summary>
         /// 查询物种历史信息
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <returns></returns>
-        public string? QueryGroupWarHistoryData(string robotWxid, string rid)
+        public string? QueryGroupWarHistoryData(string rid)
         {
-            var club = FindClub(robotWxid, rid);
+            var club = FindClub(rid);
             if (club is null) return null;
 
             switch (club.Map)
@@ -1024,17 +1148,16 @@ namespace RS.Snail.JJJ.robot.modules
         /// <summary>
         /// 生成仓鼠历史拍卖Excel
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <returns></returns>
-        public string GetGroupWarSpe4AuctionExcel(string robotWxid, string rid, bool isAdmin = false)
+        public string? GetGroupWarSpe4AuctionExcel(string rid, bool isAdmin = false)
         {
-            var club = FindClub(robotWxid, rid);
+            var club = FindClub(rid);
             if (club is null) return null;
             var map = club.Map;
             if (map != "4") return null;
 
-            var fileName = $"OUT\\{ExcelHelper.GetFileName($"仓鼠历史拍卖_{club.Name}_{rid}")}";
+            var fileName = $"OUT\\{ExcelHelper.GetFileName($"{include.files.File_AuctionStatements}_{club.Name}_{rid}")}";
 
             try
             {
@@ -1049,7 +1172,7 @@ namespace RS.Snail.JJJ.robot.modules
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, "ClubsM.GetGroupWarSpe4AuctionExcel");
+                Context.Logger.WriteException(ex, "ClubsM.GetGroupWarSpe4AuctionExcel");
                 return null;
             }
 
@@ -1057,31 +1180,29 @@ namespace RS.Snail.JJJ.robot.modules
         /// <summary>
         /// 获取仓鼠拍卖地块位置列表
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <returns></returns>
-        public List<string> GetGroupWarSpe4AuctionPoses(string robotWxid, string rid)
+        public List<string> GetGroupWarSpe4AuctionPoses(string rid)
         {
-            var club = FindClub(robotWxid, rid);
+            var club = FindClub(rid);
             if (club is null) return null;
             var weekday = RS.Snail.JJJ.Client.core.game.module.TimeM.GetWeekDayStatic();
             var data = club.GroupWarData?.dbase ?? new JObject();
             data = data[weekday.ToString()] ?? new JObject();
-            return JSONHelper.GetKeys(data);
+            return JSONHelper.GetKeys(data.blocks ?? new JObject());
         }
         /// <summary>
         /// 设置仓鼠拍卖地块
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <param name="poses"></param>
         /// <returns></returns>
-        public string SetGroupWarSpe4AuctionSetPoses(string robotWxid, string rid, List<string> poses)
+        public string SetGroupWarSpe4AuctionSetPoses(string rid, List<string> poses)
         {
-            var club = FindClub(robotWxid, rid);
+            var club = FindClub(rid);
             if (club is null) return "未找到俱乐部";
             var weekday = RS.Snail.JJJ.Client.core.game.module.TimeM.GetWeekDayStatic();
-            if (weekday < 7 || weekday > 3) return "今天不是拍卖的日子哦";
+            if (!GWSpe4AuctionWeekdays.Contains(weekday)) return "今天不是拍卖的日子哦";
             if (club.Map != "4") return "这周不是仓鼠周哦";
             var now = TimeHelper.ToTimeStamp();
 
@@ -1094,15 +1215,14 @@ namespace RS.Snail.JJJ.robot.modules
         /// <summary>
         /// 获取仓鼠拍卖地块
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <returns></returns>
-        public string GetGroupWarSpe4AuctionSetPoses(string robotWxid, string rid)
+        public string GetGroupWarSpe4AuctionSetPoses(string rid)
         {
-            var club = FindClub(robotWxid, rid);
+            var club = FindClub(rid);
             if (club is null) return "未找到俱乐部";
             var weekday = RS.Snail.JJJ.Client.core.game.module.TimeM.GetWeekDayStatic();
-            if (weekday < 7 || weekday > 3) return "今天不是拍卖的日子哦";
+            if (!GWSpe4AuctionWeekdays.Contains(weekday)) return "今天不是拍卖的日子哦";
             if (club.Map != "4") return "这周不是仓鼠周哦";
             var now = TimeHelper.ToTimeStamp();
 
@@ -1117,12 +1237,11 @@ namespace RS.Snail.JJJ.robot.modules
         /// <summary>
         /// 查询金牌
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <returns></returns>
-        public string? QueryGroupWarGoldToke(string robotWxid, string rid)
+        public string? QueryGroupWarGoldToke(string rid)
         {
-            var club = FindClub(robotWxid, rid);
+            var club = FindClub(rid);
             if (club is null) return null;
             if (!club.IsTodayUpdated()) return "今天还没更新过物种数据，请先登录一次再来查询";
 
@@ -1155,15 +1274,15 @@ namespace RS.Snail.JJJ.robot.modules
             {
                 if (lackTodayMemberCount > 0) desc.Add($"{include.emoji.HAN}今天共{lackTodayMemberCount}人共少领{lackTodayTotalCount}个金令牌");
                 desc.Add($"{include.emoji.HAN}本周共{lackMemberCount}人共少领{lackTotalCount}个金令牌");
-                if (lackMemberCount <= 20)
-                {
-                    desc.Add($"{include.emoji.SHOUZHI}\"查询金牌未领\" 查看详情");
-                    desc.Add($"{include.emoji.SHOUZHI}\"提醒金牌\"或\"提醒领物资\" 立刻提醒");
-                }
-                else
-                {
-                    desc.Add($"{include.emoji.SHOUZHI}\"查询物种总览\" 查看详情");
-                }
+                //if (lackMemberCount <= 20)
+                //{
+                desc.Add($"{include.emoji.SHOUZHI}发送\"查询金牌未领\" 查看详情");
+                desc.Add($"{include.emoji.SHOUZHI}发送\"提醒金牌\"或\"提醒领物资\" 立刻提醒");
+                //}
+                //else
+                //{
+                //    desc.Add($"{include.emoji.SHOUZHI}\"查询物种总览\" 查看详情");
+                //}
             }
             desc.Add("");
 
@@ -1185,15 +1304,15 @@ namespace RS.Snail.JJJ.robot.modules
             else
             {
                 desc.Add($"{include.emoji.HAN}共{notUseMemberCount}人共剩余{notUseCount}个金令牌");
-                if (notUseMemberCount <= 20)
-                {
-                    desc.Add($"{include.emoji.SHOUZHI}\"查询金牌未用\"或\"查询金牌剩余\" 查看详情");
-                    desc.Add($"{include.emoji.SHOUZHI}\"提醒用金牌\"或\"提醒清金牌\"或\"提醒清物资\" 立刻提醒");
-                }
-                else
-                {
-                    desc.Add($"{include.emoji.SHOUZHI}\"查询物种总览\" 查看详情");
-                }
+                //if (notUseMemberCount <= 20)
+                //{
+                desc.Add($"{include.emoji.SHOUZHI}发送\"查询金牌未用\"或\"查询金牌剩余\" 查看详情");
+                desc.Add($"{include.emoji.SHOUZHI}发送\"提醒用金牌\"或\"提醒清金牌\"或\"提醒清物资\" 立刻提醒");
+                //}
+                //else
+                //{
+                //    desc.Add($"{include.emoji.SHOUZHI}\"查询物种总览\" 查看详情");
+                //}
 
             }
             desc.Add("");
@@ -1210,17 +1329,12 @@ namespace RS.Snail.JJJ.robot.modules
             }
             if (buyMemberCount == 0)
             {
-                desc.Add($"{include.emoji.HAN}大家都用没氪金令牌！");
-            }
-            else if (buyMemberCount <= 30)
-            {
-                desc.Add($"{include.emoji.ZAN}共{buyMemberCount}/{club.Members.Count}人氪了金令牌");
-                desc.Add($"{include.emoji.SHOUZHI}\"查询金牌已氪\" 查看详情");
+                desc.Add($"{include.emoji.HAN}大家都没氪金令牌！");
             }
             else if (buyMemberCount < club.Members.Count)
             {
-                desc.Add($"{include.emoji.HAHA}共{buyMemberCount}/{club.Members.Count}人氪了金令牌");
-                desc.Add($"{include.emoji.SHOUZHI}\"查询物种总览\" 查看详情");
+                desc.Add($"{include.emoji.ZAN}共{buyMemberCount}/{club.Members.Count}人氪了金令牌");
+                desc.Add($"{include.emoji.SHOUZHI}发送\"查询金牌已氪\" 查看详情");
             }
             else
             {
@@ -1238,37 +1352,24 @@ namespace RS.Snail.JJJ.robot.modules
                     notBuyMemberCount++;
                 }
             }
-            if (notBuyMemberCount == 0)
-            {
-                desc.Add($"{include.emoji.HAHA}大家都氪金令牌啦！");
-            }
-            else if (notBuyMemberCount <= 30)
+            if (notBuyMemberCount > 0 && notBuyMemberCount < club.Members.Count)
             {
                 desc.Add($"{include.emoji.HAN}共{notBuyMemberCount}/{club.Members.Count}人没氪金令牌");
-                desc.Add($"{include.emoji.SHOUZHI}\"查询金牌未氪\" 查看详情");
-                desc.Add($"{include.emoji.SHOUZHI}\"提醒氪金牌\" 立刻提醒");
+                desc.Add($"{include.emoji.SHOUZHI}发送\"查询金牌未氪\" 查看详情");
+                desc.Add($"{include.emoji.SHOUZHI}发送\"提醒氪金牌\" 立刻提醒");
             }
-            else if (notBuyMemberCount < club.Members.Count)
-            {
-                desc.Add($"{include.emoji.HAN}共{notBuyMemberCount}/{club.Members.Count}人没氪金令牌");
-                desc.Add($"{include.emoji.SHOUZHI}\"查询物种总览\" 查看详情");
-            }
-            else
-            {
-                desc.Add($"{include.emoji.HAN}大家都用没氪金令牌！");
-            }
+
 
             return string.Join("\n", desc);
         }
         /// <summary>
         /// 查询金牌未领
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <returns></returns>
-        public string QueryGroupWarGoldTokeLack(string robotWxid, string rid)
+        public string QueryGroupWarGoldTokeLack(string rid)
         {
-            var club = FindClub(robotWxid, rid);
+            var club = FindClub(rid);
             if (club is null) return null;
             if (!club.IsTodayUpdated()) return "今天还没更新过物种数据，请先登录一次再来查询";
 
@@ -1294,7 +1395,7 @@ namespace RS.Snail.JJJ.robot.modules
                 }
                 if (_lackToday > 0 || _lackTotal > 0)
                 {
-                    list.Add($"{emoji.ZHUYI}[{QueryMemberName(robotWxid, item.Key)}]今天少{_lackToday}个，本周少{_lackTotal}个");
+                    list.Add($"{emoji.ZHUYI}[{QueryMemberName(item.Key)}]今天少{_lackToday}个，本周少{_lackTotal}个");
                 }
             }
             if (lackTotalCount == 0)
@@ -1305,28 +1406,27 @@ namespace RS.Snail.JJJ.robot.modules
             {
                 if (lackTodayMemberCount > 0) desc.Add($"今天共{lackTodayMemberCount}人共少领{lackTodayTotalCount}个金令牌");
                 desc.Add($"本周共{lackMemberCount}人共少领{lackTotalCount}个金令牌");
-                if (lackMemberCount <= 20)
-                {
-                    desc.AddRange(list);
-                    desc.Add($"{include.emoji.SHOUZHI}\"提醒金牌\"或\"提醒领物资\" 立刻提醒");
-                }
-                else
-                {
-                    desc.Add($"人太多了，请按以下提示操作：");
-                    desc.Add($"{include.emoji.SHOUZHI}\"查询物种总览\" 查看详情");
-                }
+                //if (lackMemberCount <= 20)
+                //{
+                desc.AddRange(list);
+                desc.Add($"{include.emoji.SHOUZHI}发送\"提醒金牌\"或\"提醒领物资\" 立刻提醒");
+                //}
+                //else
+                //{
+                //    desc.Add($"人太多了，请按以下提示操作：");
+                //    desc.Add($"{include.emoji.SHOUZHI}\"查询物种总览\" 查看详情");
+                //}
             }
             return string.Join("\n", desc);
         }
         /// <summary>
         /// 查询金牌剩余
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <returns></returns>
-        public string QueryGroupWarGoldTokeNotUse(string robotWxid, string rid)
+        public string QueryGroupWarGoldTokeNotUse(string rid)
         {
-            var club = FindClub(robotWxid, rid);
+            var club = FindClub(rid);
             if (club is null) return null;
             if (!club.IsTodayUpdated()) return "今天还没更新过物种数据，请先登录一次再来查询";
 
@@ -1335,6 +1435,8 @@ namespace RS.Snail.JJJ.robot.modules
             var list = new List<string>();
             // 未领
             data = QueryGroupWarGoldTokenList(club, include.TokenQueryType.NOT_USE);
+            data = data.OrderByDescending(o => o.Value).ToDictionary(o => o.Key, p => p.Value);
+
             int notUseCount = 0, notUseMemberCount = 0;
             foreach (var item in data)
             {
@@ -1342,7 +1444,7 @@ namespace RS.Snail.JJJ.robot.modules
                 {
                     notUseCount += item.Value;
                     notUseMemberCount++;
-                    list.Add($"{emoji.ZHUYI}[{QueryMemberName(robotWxid, item.Key)}]剩余{item.Value}个");
+                    list.Add($"{emoji.ZHUYI}[{QueryMemberName(item.Key)}]剩余{item.Value}个");
                 }
             }
             if (notUseCount == 0)
@@ -1351,17 +1453,18 @@ namespace RS.Snail.JJJ.robot.modules
             }
             else
             {
+
                 desc.Add($"共{notUseMemberCount}人共剩余{notUseCount}个金令牌");
-                if (notUseMemberCount <= 20)
-                {
-                    desc.AddRange(list);
-                    desc.Add($"{include.emoji.SHOUZHI}\"提醒用金牌\"或\"提醒清金牌\"或\"提醒清物资\" 立刻提醒");
-                }
-                else
-                {
-                    desc.Add($"人太多了，请按以下提示操作：");
-                    desc.Add($"{include.emoji.SHOUZHI}\"查询物种总览\" 查看详情");
-                }
+                //if (notUseMemberCount <= 20)
+                //{
+                desc.AddRange(list);
+                desc.Add($"{include.emoji.SHOUZHI}发送\"提醒用金牌\"或\"提醒清金牌\"或\"提醒清物资\" 立刻提醒");
+                //}
+                //else
+                //{
+                //desc.Add($"人太多了，请按以下提示操作：");
+                //desc.Add($"{include.emoji.SHOUZHI}\"查询物种总览\" 查看详情");
+                //}
 
             }
 
@@ -1370,12 +1473,11 @@ namespace RS.Snail.JJJ.robot.modules
         /// <summary>
         /// 查询金牌已氪
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <returns></returns>
-        public string QueryGroupWarGoldTokeBuy(string robotWxid, string rid)
+        public string QueryGroupWarGoldTokeBuy(string rid)
         {
-            var club = FindClub(robotWxid, rid);
+            var club = FindClub(rid);
             if (club is null) return null;
             if (!club.IsTodayUpdated()) return "今天还没更新过物种数据，请先登录一次再来查询";
 
@@ -1390,24 +1492,18 @@ namespace RS.Snail.JJJ.robot.modules
                 if (item.Value > 0)
                 {
                     buyMemberCount++;
-                    list.Add($"{emoji.ZAN} {QueryMemberName(robotWxid, item.Key)}");
+                    list.Add($"{emoji.ZAN} {QueryMemberName(item.Key)}");
                 }
             }
             if (buyMemberCount == 0)
             {
-                desc.Add($"{include.emoji.HAN}大家都用没氪金令牌！");
-            }
-            else if (buyMemberCount <= 30)
-            {
-                desc.Add($"共{buyMemberCount}/{club.Members.Count}人氪了金令牌");
-                desc.AddRange(list);
-                desc.Add($"{include.emoji.SHOUZHI}\"提醒氪金牌\" 立刻提醒");
+                desc.Add($"{include.emoji.HAN}大家都没氪金令牌！");
             }
             else if (buyMemberCount < club.Members.Count)
             {
                 desc.Add($"共{buyMemberCount}/{club.Members.Count}人氪了金令牌");
-                desc.Add($"人太多了，请按以下提示操作：");
-                desc.Add($"{include.emoji.SHOUZHI}\"查询物种总览\" 查看详情");
+                desc.AddRange(list);
+                desc.Add($"{include.emoji.SHOUZHI}发送\"提醒氪金牌\" 立刻提醒");
             }
             else
             {
@@ -1419,12 +1515,11 @@ namespace RS.Snail.JJJ.robot.modules
         /// <summary>
         /// 查询金牌未氪
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <returns></returns>
-        public string QueryGroupWarGoldTokeNotBuy(string robotWxid, string rid)
+        public string QueryGroupWarGoldTokeNotBuy(string rid)
         {
-            var club = FindClub(robotWxid, rid);
+            var club = FindClub(rid);
             if (club is null) return null;
             if (!club.IsTodayUpdated()) return "今天还没更新过物种数据，请先登录一次再来查询";
 
@@ -1439,28 +1534,22 @@ namespace RS.Snail.JJJ.robot.modules
                 if (item.Value > 0)
                 {
                     notBuyMemberCount++;
-                    list.Add($"{QueryMemberName(robotWxid, item.Key)}");
+                    list.Add($"{QueryMemberName(item.Key)}");
                 }
             }
             if (notBuyMemberCount == 0)
             {
                 desc.Add($"{include.emoji.HAHA}大家都氪金令牌啦！");
             }
-            else if (notBuyMemberCount <= 30)
-            {
-                desc.Add($"共{notBuyMemberCount}/{club.Members.Count}人没氪金令牌");
-                desc.AddRange(list);
-                desc.Add($"{include.emoji.SHOUZHI}\"提醒氪金牌\" 立刻提醒");
-            }
             else if (notBuyMemberCount < club.Members.Count)
             {
                 desc.Add($"共{notBuyMemberCount}/{club.Members.Count}人没氪金令牌");
-                desc.Add($"人太多了，请按以下提示操作：");
-                desc.Add($"{include.emoji.SHOUZHI}\"查询物种总览\" 查看详情");
+                desc.AddRange(list);
+                desc.Add($"{include.emoji.SHOUZHI}发送\"提醒氪金牌\" 立刻提醒");
             }
             else
             {
-                desc.Add($"{include.emoji.HAN}大家都用没氪金令牌！");
+                desc.Add($"{include.emoji.HAN}大家都没氪金令牌！");
             }
 
             return string.Join("\n", desc);
@@ -1471,13 +1560,12 @@ namespace RS.Snail.JJJ.robot.modules
         /// <summary>
         /// 查询银牌
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <param name="type"></param>
         /// <returns></returns>
-        public string? QueryGroupWarSilverToke(string robotWxid, string rid)
+        public string? QueryGroupWarSilverToke(string rid)
         {
-            var club = FindClub(robotWxid, rid);
+            var club = FindClub(rid);
             if (club is null) return null;
             if (!club.IsTodayUpdated()) return "今天还没更新过物种数据，请先登录一次再来查询";
 
@@ -1510,15 +1598,7 @@ namespace RS.Snail.JJJ.robot.modules
             {
                 if (lackTodayMemberCount > 0) desc.Add($"{include.emoji.HAN}今天共{lackTodayMemberCount}人共少领{lackTodayTotalCount}个银令牌");
                 desc.Add($"{include.emoji.HAN}本周共{lackMemberCount}人共少领{lackTotalCount}个银令牌");
-                if (lackMemberCount <= 20)
-                {
-                    desc.Add($"{include.emoji.SHOUZHI}\"查询银牌未领\" 查看详情");
-                    desc.Add($"{include.emoji.SHOUZHI}\"提醒银牌\"或\"提醒领物资\" 立刻提醒");
-                }
-                else
-                {
-                    desc.Add($"{include.emoji.SHOUZHI}\"查询物种总览\" 查看详情");
-                }
+                desc.Add($"{include.emoji.SHOUZHI}发送\"提醒银牌\"或\"提醒领物资\" 立刻提醒");
             }
             desc.Add("");
 
@@ -1540,16 +1620,8 @@ namespace RS.Snail.JJJ.robot.modules
             else
             {
                 desc.Add($"{include.emoji.HAN}共{notUseMemberCount}人共剩余{notUseCount}个银令牌");
-                if (notUseMemberCount <= 20)
-                {
-                    desc.Add($"{include.emoji.SHOUZHI}\"查询银牌未用\"或\"查询银牌剩余\" 查看详情");
-                    desc.Add($"{include.emoji.SHOUZHI}\"提醒用银牌\"或\"提醒清银牌\"或\"提醒清物资\" 立刻提醒");
-                }
-                else
-                {
-                    desc.Add($"{include.emoji.SHOUZHI}\"查询物种总览\" 查看详情");
-                }
-
+                desc.Add($"{include.emoji.SHOUZHI}发送\"查询银牌未用\"或\"查询银牌剩余\" 查看详情");
+                desc.Add($"{include.emoji.SHOUZHI}发送\"提醒用银牌\"或\"提醒清银牌\"或\"提醒清物资\" 立刻提醒");
             }
             desc.Add("");
 
@@ -1565,17 +1637,17 @@ namespace RS.Snail.JJJ.robot.modules
             }
             if (buyMemberCount == 0)
             {
-                desc.Add($"{include.emoji.HAN}大家都用没氪银令牌！");
+                desc.Add($"{include.emoji.HAN}大家都没氪银令牌！");
             }
             else if (buyMemberCount <= 30)
             {
                 desc.Add($"{include.emoji.HAHA}共{buyMemberCount}/{club.Members.Count}人氪了银令牌");
-                desc.Add($"{include.emoji.SHOUZHI}\"查询银牌已氪\" 查看详情");
+                desc.Add($"{include.emoji.SHOUZHI}发送\"查询银牌已氪\" 查看详情");
             }
             else if (buyMemberCount < club.Members.Count)
             {
                 desc.Add($"{include.emoji.HAHA}共{buyMemberCount}/{club.Members.Count}人氪了银令牌");
-                desc.Add($"{include.emoji.SHOUZHI}\"查询物种总览\" 查看详情");
+                desc.Add($"{include.emoji.SHOUZHI}发送\"查询物种总览\" 查看详情");
             }
             else
             {
@@ -1593,37 +1665,24 @@ namespace RS.Snail.JJJ.robot.modules
                     notBuyMemberCount++;
                 }
             }
-            if (notBuyMemberCount == 0)
-            {
-                desc.Add($"{include.emoji.HAHA}大家都氪银令牌啦！");
-            }
-            else if (notBuyMemberCount <= 30)
+            if (notBuyMemberCount > 0 && notBuyMemberCount < club.Members.Count)
             {
                 desc.Add($"{include.emoji.HAN}共{notBuyMemberCount}/{club.Members.Count}人没氪银令牌");
-                desc.Add($"{include.emoji.SHOUZHI}\"查询银牌未氪\" 查看详情");
-                desc.Add($"{include.emoji.SHOUZHI}\"提醒氪银牌\" 立刻提醒");
+                desc.Add($"{include.emoji.SHOUZHI}发送\"查询银牌未氪\" 查看详情");
+                desc.Add($"{include.emoji.SHOUZHI}发送\"提醒氪银牌\" 立刻提醒");
             }
-            else if (notBuyMemberCount < club.Members.Count)
-            {
-                desc.Add($"{include.emoji.HAN}共{notBuyMemberCount}/{club.Members.Count}人没氪银令牌");
-                desc.Add($"{include.emoji.SHOUZHI}\"查询物种总览\" 查看详情");
-            }
-            else
-            {
-                desc.Add($"{include.emoji.HAN}大家都用没氪银令牌！");
-            }
+
 
             return string.Join("\n", desc);
         }
         /// <summary>
         /// 查询银牌未领
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <returns></returns>
-        public string QueryGroupWarSilverTokeLack(string robotWxid, string rid)
+        public string QueryGroupWarSilverTokeLack(string rid)
         {
-            var club = FindClub(robotWxid, rid);
+            var club = FindClub(rid);
             if (club is null) return null;
             if (!club.IsTodayUpdated()) return "今天还没更新过物种数据，请先登录一次再来查询";
 
@@ -1649,7 +1708,7 @@ namespace RS.Snail.JJJ.robot.modules
                 }
                 if (_lackToday > 0 || _lackTotal > 0)
                 {
-                    list.Add($"{emoji.ZHUYI}[{QueryMemberName(robotWxid, item.Key)}]今天少{_lackToday}个，本周少{_lackTotal}个");
+                    list.Add($"{emoji.ZHUYI}[{QueryMemberName(item.Key)}]今天少{_lackToday}个，本周少{_lackTotal}个");
                 }
             }
             if (lackTotalCount == 0)
@@ -1660,28 +1719,27 @@ namespace RS.Snail.JJJ.robot.modules
             {
                 if (lackTodayMemberCount > 0) desc.Add($"今天共{lackTodayMemberCount}人共少领{lackTodayTotalCount}个银令牌");
                 desc.Add($"本周共{lackMemberCount}人共少领{lackTotalCount}个银令牌");
-                if (lackMemberCount <= 20)
-                {
-                    desc.AddRange(list);
-                    desc.Add($"{include.emoji.SHOUZHI}\"提醒银牌\"或\"提醒领物资\" 立刻提醒");
-                }
-                else
-                {
-                    desc.Add($"人太多了，请按以下提示操作：");
-                    desc.Add($"{include.emoji.SHOUZHI}\"查询物种总览\" 查看详情");
-                }
+                //if (lackMemberCount <= 20)
+                //{
+                desc.AddRange(list);
+                desc.Add($"{include.emoji.SHOUZHI}发送\"提醒银牌\"或\"提醒领物资\" 立刻提醒");
+                //}
+                //else
+                //{
+                //    desc.Add($"人太多了，请按以下提示操作：");
+                //    desc.Add($"{include.emoji.SHOUZHI}\"查询物种总览\" 查看详情");
+                //}
             }
             return string.Join("\n", desc);
         }
         /// <summary>
         /// 查询银牌剩余
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <returns></returns>
-        public string QueryGroupWarSilverTokeNotUse(string robotWxid, string rid)
+        public string QueryGroupWarSilverTokeNotUse(string rid)
         {
-            var club = FindClub(robotWxid, rid);
+            var club = FindClub(rid);
             if (club is null) return null;
             if (!club.IsTodayUpdated()) return "今天还没更新过物种数据，请先登录一次再来查询";
 
@@ -1690,6 +1748,7 @@ namespace RS.Snail.JJJ.robot.modules
             var list = new List<string>();
             // 未领
             data = QueryGroupWarSilverTokenList(club, include.TokenQueryType.NOT_USE);
+            data = data.OrderByDescending(o => o.Value).ToDictionary(o => o.Key, p => p.Value);
             int notUseCount = 0, notUseMemberCount = 0;
             foreach (var item in data)
             {
@@ -1697,7 +1756,7 @@ namespace RS.Snail.JJJ.robot.modules
                 {
                     notUseCount += item.Value;
                     notUseMemberCount++;
-                    list.Add($"{emoji.ZHUYI}[{QueryMemberName(robotWxid, item.Key)}]剩余{item.Value}个");
+                    list.Add($"{emoji.ZHUYI}[{QueryMemberName(item.Key)}]剩余{item.Value}个");
                 }
             }
             if (notUseCount == 0)
@@ -1707,30 +1766,27 @@ namespace RS.Snail.JJJ.robot.modules
             else
             {
                 desc.Add($"共{notUseMemberCount}人共剩余{notUseCount}个银令牌");
-                if (notUseMemberCount <= 20)
-                {
-                    desc.AddRange(list);
-                    desc.Add($"{include.emoji.SHOUZHI}\"提醒用银牌\"或\"提醒清银牌\"或\"提醒清物资\" 立刻提醒");
-                }
-                else
-                {
-                    desc.Add($"人太多了，请按以下提示操作：");
-                    desc.Add($"{include.emoji.SHOUZHI}\"查询物种总览\" 查看详情");
-                }
-
+                //if (notUseMemberCount <= 20)
+                //{
+                desc.AddRange(list);
+                desc.Add($"{include.emoji.SHOUZHI}发送\"提醒用银牌\"或\"提醒清银牌\"或\"提醒清物资\" 立刻提醒");
+                //}
+                //else
+                //{
+                //    desc.Add($"人太多了，请按以下提示操作：");
+                //    desc.Add($"{include.emoji.SHOUZHI}\"查询物种总览\" 查看详情");
+                //}
             }
-
             return string.Join("\n", desc);
         }
         /// <summary>
         /// 查询银牌已氪
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <returns></returns>
-        public string QueryGroupWarSilverTokeBuy(string robotWxid, string rid)
+        public string QueryGroupWarSilverTokeBuy(string rid)
         {
-            var club = FindClub(robotWxid, rid);
+            var club = FindClub(rid);
             if (club is null) return null;
             if (!club.IsTodayUpdated()) return "今天还没更新过物种数据，请先登录一次再来查询";
 
@@ -1745,24 +1801,18 @@ namespace RS.Snail.JJJ.robot.modules
                 if (item.Value > 0)
                 {
                     buyMemberCount++;
-                    list.Add($"{emoji.ZAN} {QueryMemberName(robotWxid, item.Key)}");
+                    list.Add($"{emoji.ZAN} {QueryMemberName(item.Key)}");
                 }
             }
             if (buyMemberCount == 0)
             {
-                desc.Add($"{include.emoji.HAN}大家都用没氪银令牌！");
-            }
-            else if (buyMemberCount <= 30)
-            {
-                desc.Add($"共{buyMemberCount}/{club.Members.Count}人氪了银令牌");
-                desc.AddRange(list);
-                desc.Add($"{include.emoji.SHOUZHI}\"提醒氪银牌\" 立刻提醒");
+                desc.Add($"{include.emoji.HAN}大家都没氪银令牌！");
             }
             else if (buyMemberCount < club.Members.Count)
             {
                 desc.Add($"共{buyMemberCount}/{club.Members.Count}人氪了银令牌");
-                desc.Add($"人太多了，请按以下提示操作：");
-                desc.Add($"{include.emoji.SHOUZHI}\"查询物种总览\" 查看详情");
+                desc.AddRange(list);
+                desc.Add($"{include.emoji.SHOUZHI}发送\"提醒氪银牌\" 立刻提醒");
             }
             else
             {
@@ -1774,12 +1824,11 @@ namespace RS.Snail.JJJ.robot.modules
         /// <summary>
         /// 查询银牌未氪
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <returns></returns>
-        public string QueryGroupWarSilverTokeNotBuy(string robotWxid, string rid)
+        public string QueryGroupWarSilverTokeNotBuy(string rid)
         {
-            var club = FindClub(robotWxid, rid);
+            var club = FindClub(rid);
             if (club is null) return null;
             if (!club.IsTodayUpdated()) return "今天还没更新过物种数据，请先登录一次再来查询";
 
@@ -1794,28 +1843,22 @@ namespace RS.Snail.JJJ.robot.modules
                 if (item.Value > 0)
                 {
                     notBuyMemberCount++;
-                    list.Add($"{QueryMemberName(robotWxid, item.Key)}");
+                    list.Add($"{QueryMemberName(item.Key)}");
                 }
             }
             if (notBuyMemberCount == 0)
             {
                 desc.Add($"{include.emoji.HAHA}大家都氪银令牌啦！");
             }
-            else if (notBuyMemberCount <= 30)
-            {
-                desc.Add($"共{notBuyMemberCount}/{club.Members.Count}人没氪银令牌");
-                desc.AddRange(list);
-                desc.Add($"{include.emoji.SHOUZHI}\"提醒氪银牌\" 立刻提醒");
-            }
             else if (notBuyMemberCount < club.Members.Count)
             {
                 desc.Add($"共{notBuyMemberCount}/{club.Members.Count}人没氪银令牌");
-                desc.Add($"人太多了，请按以下提示操作：");
-                desc.Add($"{include.emoji.SHOUZHI}\"查询物种总览\" 查看详情");
+                desc.AddRange(list);
+                desc.Add($"{include.emoji.SHOUZHI}发送\"提醒氪银牌\" 立刻提醒");
             }
             else
             {
-                desc.Add($"{include.emoji.HAN}大家都用没氪银令牌！");
+                desc.Add($"{include.emoji.HAN}大家都没氪银令牌！");
             }
 
             return string.Join("\n", desc);
@@ -1826,12 +1869,11 @@ namespace RS.Snail.JJJ.robot.modules
         /// <summary>
         /// 查询钻头
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <returns></returns>
-        public string QueryGroupWarDrill(string robotWxid, string rid)
+        public string QueryGroupWarDrill(string rid)
         {
-            var club = FindClub(robotWxid, rid);
+            var club = FindClub(rid);
             if (club is null) return null;
             if (!club.IsTodayUpdated()) return "今天还没更新过物种数据，请先登录一次再来查询";
 
@@ -1840,6 +1882,7 @@ namespace RS.Snail.JJJ.robot.modules
 
             // 未用
             data = QueryGroupWarDrillList(club, include.DrillQueryType.NOT_USE);
+            data = data.OrderByDescending(o => o.Value).ToDictionary(o => o.Key, p => p.Value);
             int notUseCount = 0, notUseMemberCount = 0;
             foreach (var item in data)
             {
@@ -1856,15 +1899,15 @@ namespace RS.Snail.JJJ.robot.modules
             else
             {
                 desc.Add($"{include.emoji.HAN}共{notUseMemberCount}人共剩余{notUseCount}个钻头");
-                if (notUseMemberCount <= 20)
-                {
-                    desc.Add($"{include.emoji.SHOUZHI}\"查询钻头未用\"或\"查询钻头剩余\" 查看详情");
-                    desc.Add($"{include.emoji.SHOUZHI}\"提醒钻头\"或\"提醒清物资\" 立刻提醒");
-                }
-                else
-                {
-                    desc.Add($"{include.emoji.SHOUZHI}\"查询物种总览\" 查看详情");
-                }
+                //if (notUseMemberCount <= 20)
+                //{
+                desc.Add($"{include.emoji.SHOUZHI}发送\"查询钻头未用\"或\"查询钻头剩余\" 查看详情");
+                desc.Add($"{include.emoji.SHOUZHI}发送\"提醒钻头\"或\"提醒清物资\" 立刻提醒");
+                //}
+                //else
+                //{
+                //    desc.Add($"{include.emoji.SHOUZHI}\"查询物种总览\" 查看详情");
+                //}
             }
             desc.Add("");
 
@@ -1886,14 +1929,14 @@ namespace RS.Snail.JJJ.robot.modules
             else
             {
                 desc.Add($"{include.emoji.HAN}共{lackMemberCount}人距离达标共差{lackCount}个钻头");
-                if (lackMemberCount <= 20)
-                {
-                    desc.Add($"{include.emoji.SHOUZHI}\"查询钻头未达标\" 查看详情");
-                }
-                else
-                {
-                    desc.Add($"{include.emoji.SHOUZHI}\"查询物种总览\" 查看详情");
-                }
+                //if (lackMemberCount <= 20)
+                //{
+                desc.Add($"{include.emoji.SHOUZHI}发送\"查询钻头未达标\" 查看详情");
+                //}
+                //else
+                //{
+                // desc.Add($"{include.emoji.SHOUZHI}\"查询物种总览\" 查看详情");
+                //}
             }
 
             return string.Join("\n", desc);
@@ -1901,12 +1944,11 @@ namespace RS.Snail.JJJ.robot.modules
         /// <summary>
         /// 查询钻头剩余
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <returns></returns>
-        public string QueryGroupWarDrillNotUse(string robotWxid, string rid)
+        public string QueryGroupWarDrillNotUse(string rid)
         {
-            var club = FindClub(robotWxid, rid);
+            var club = FindClub(rid);
             if (club is null) return null;
             if (!club.IsTodayUpdated()) return "今天还没更新过物种数据，请先登录一次再来查询";
 
@@ -1915,6 +1957,7 @@ namespace RS.Snail.JJJ.robot.modules
             var list = new List<string>();
             // 未领
             data = QueryGroupWarDrillList(club, include.DrillQueryType.NOT_USE);
+            data = data.OrderByDescending(o => o.Value).ToDictionary(o => o.Key, p => p.Value);
             int notUseCount = 0, notUseMemberCount = 0;
             foreach (var item in data)
             {
@@ -1922,7 +1965,7 @@ namespace RS.Snail.JJJ.robot.modules
                 {
                     notUseCount += item.Value;
                     notUseMemberCount++;
-                    list.Add($"{emoji.ZHUYI}[{QueryMemberName(robotWxid, item.Key)}]剩余{item.Value}个");
+                    list.Add($"{emoji.ZHUYI}[{QueryMemberName(item.Key)}]剩余{item.Value}个");
                 }
             }
             if (notUseCount == 0)
@@ -1932,16 +1975,16 @@ namespace RS.Snail.JJJ.robot.modules
             else
             {
                 desc.Add($"{include.emoji.HAN}共{notUseMemberCount}人共剩余{notUseCount}个钻头");
-                if (notUseMemberCount <= 20)
-                {
-                    desc.AddRange(list);
-                    desc.Add($"{include.emoji.SHOUZHI}\"提醒钻头\"或\"提醒清物资\" 立刻提醒");
-                }
-                else
-                {
-                    desc.Add($"人太多了，请按以下提示操作：");
-                    desc.Add($"{include.emoji.SHOUZHI}\"查询物种总览\" 查看详情");
-                }
+                //if (notUseMemberCount <= 20)
+                //{
+                desc.AddRange(list);
+                desc.Add($"{include.emoji.SHOUZHI}发送\"提醒钻头\"或\"提醒清物资\" 立刻提醒");
+                //}
+                //else
+                //{
+                //    desc.Add($"人太多了，请按以下提示操作：");
+                //    desc.Add($"{include.emoji.SHOUZHI}\"查询物种总览\" 查看详情");
+                //}
             }
 
             return string.Join("\n", desc);
@@ -1949,12 +1992,11 @@ namespace RS.Snail.JJJ.robot.modules
         /// <summary>
         /// 查询钻头未达标
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <returns></returns>
-        public string QueryGroupWarDrillLack(string robotWxid, string rid)
+        public string QueryGroupWarDrillLack(string rid)
         {
-            var club = FindClub(robotWxid, rid);
+            var club = FindClub(rid);
             if (club is null) return null;
             if (!club.IsTodayUpdated()) return "今天还没更新过物种数据，请先登录一次再来查询";
 
@@ -1963,6 +2005,7 @@ namespace RS.Snail.JJJ.robot.modules
             var list = new List<string>();
             // 未领
             data = QueryGroupWarDrillList(club, include.DrillQueryType.LACK);
+            data = data.OrderByDescending(o => o.Value).ToDictionary(o => o.Key, p => p.Value);
             int lackCount = 0, lackMemberCount = 0;
             foreach (var item in data)
             {
@@ -1970,7 +2013,7 @@ namespace RS.Snail.JJJ.robot.modules
                 {
                     lackCount += item.Value;
                     lackMemberCount++;
-                    list.Add($"{emoji.ZHUYI}[{QueryMemberName(robotWxid, item.Key)}]还差{item.Value}个");
+                    list.Add($"{emoji.ZHUYI}[{QueryMemberName(item.Key)}]还差{item.Value}个");
                 }
             }
             if (lackCount == 0)
@@ -1980,16 +2023,17 @@ namespace RS.Snail.JJJ.robot.modules
             else
             {
                 desc.Add($"{include.emoji.HAN}共{lackMemberCount}人距离达标共差{lackCount}个钻头");
-                if (lackMemberCount <= 20)
-                {
-                    desc.AddRange(list);
-                    desc.Add($"{include.emoji.SHOUZHI}\"查询钻头未达标\"查看详情");
-                }
-                else
-                {
-                    desc.Add($"人太多了，请按以下提示操作：");
-                    desc.Add($"{include.emoji.SHOUZHI}\"查询物种总览\" 查看详情");
-                }
+                //if (lackMemberCount <= 20)
+                //{
+                desc.AddRange(list);
+                //}
+                //else
+                //{
+                //    desc.Add($"人太多了，请按以下提示操作：");
+                //    desc.Add($"{include.emoji.SHOUZHI}\"查询物种总览\" 查看详情");
+                //}
+
+
             }
 
             return string.Join("\n", desc);
@@ -2000,13 +2044,12 @@ namespace RS.Snail.JJJ.robot.modules
         /// <summary>
         /// 查询挖矿
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <param name="near"></param>
         /// <returns></returns>
-        public string QueryGroupWarMine(string robotWxid, string rid, double near = 0.5)
+        public string QueryGroupWarMine(string rid, double near = 0.5)
         {
-            var club = FindClub(robotWxid, rid);
+            var club = FindClub(rid);
             if (club is null) return null;
             if (!club.IsTodayUpdated()) return "今天还没更新过物种数据，请先登录一次再来查询";
 
@@ -2026,36 +2069,34 @@ namespace RS.Snail.JJJ.robot.modules
             if (lackCount > 0)
             {
                 desc.Add($"{emoji.YIWEN}共{lackCount}人正在跳矿或不在矿中");
-                if (lackCount < 20) desc.Add($"{include.emoji.SHOUZHI}\"查询挖矿超时\" 查看详情");
-                desc.Add($"{include.emoji.SHOUZHI}\"提醒挖矿\" 立即提醒");
+                desc.Add($"{include.emoji.SHOUZHI}发送\"查询挖矿超时\" 查看详情");
+                desc.Add($"{include.emoji.SHOUZHI}发送\"提醒挖矿\" 立即提醒");
             }
             if (exceedCount > 0)
             {
                 if (desc.Count > 0) desc.Add("");
                 desc.Add($"{emoji.BAOZHA}共{exceedCount}人已超时");
-                if (exceedCount < 20) desc.Add($"{include.emoji.SHOUZHI}\"查询挖矿超时\" 查看详情");
-                desc.Add($"{include.emoji.SHOUZHI}\"提醒挖矿\" 立即提醒");
+                desc.Add($"{include.emoji.SHOUZHI}发送\"查询挖矿超时\" 查看详情");
+                desc.Add($"{include.emoji.SHOUZHI}发送\"提醒挖矿\" 立即提醒");
             }
             if (nearCount > 0)
             {
                 if (desc.Count > 0) desc.Add("");
                 desc.Add($"{emoji.NAOZHONG}共{nearCount}人将在{near:N2}小时内超时");
-                if (nearCount < 20) desc.Add($"{include.emoji.SHOUZHI}\"查询挖矿到期\"或\"查询挖矿即将到期\" 查看详情");
+                desc.Add($"{include.emoji.SHOUZHI}发送\"查询挖矿到期\"或\"查询挖矿即将到期\" 查看详情");
             }
 
             if (desc.Count == 0) desc.Add("大家都在好好挖矿~");
-
             return string.Join("\n", desc);
         }
         /// <summary>
         /// 查询挖矿超时
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <returns></returns>
-        public string QueryGroupWarMineExceed(string robotWxid, string rid)
+        public string QueryGroupWarMineExceed(string rid)
         {
-            var club = FindClub(robotWxid, rid);
+            var club = FindClub(rid);
             if (club is null) return null;
             if (!club.IsTodayUpdated()) return "今天还没更新过物种数据，请先登录一次再来查询";
 
@@ -2070,34 +2111,36 @@ namespace RS.Snail.JJJ.robot.modules
                 if (item.Value <= 0)
                 {
                     lackCount++;
-                    listLack.Add($"{emoji.YIWEN} {QueryMemberName(robotWxid, item.Key)}");
+                    listLack.Add($"{emoji.YIWEN} {QueryMemberName(item.Key)}");
                 }
                 else if (item.Value < now)
                 {
-                    listExceed.Add($"{emoji.BAOZHA} [{QueryMemberName(robotWxid, item.Key)}]超时{TimeHelper.ChinsesTimeDurationDesc(now - item.Value)}");
+                    listExceed.Add($"{emoji.BAOZHA} [{QueryMemberName(item.Key)}]超时{TimeHelper.ChinsesTimeDurationDesc(now - item.Value)}");
                     exceedCount++;
                 }
             }
             if (lackCount > 0)
             {
                 desc.Add($"共{lackCount}人正在跳矿或不在矿中");
-                if (lackCount <= 20) desc.AddRange(listLack);
-                else
-                {
-                    desc.Add($"人太多了，请按以下提示操作：");
-                    desc.Add($"{include.emoji.SHOUZHI}\"查询物种总览\" 查看详情");
-                }
+                /*if (lackCount <= 20)*/
+                desc.AddRange(listLack);
+                //else
+                //{
+                //    desc.Add($"人太多了，请按以下提示操作：");
+                //    desc.Add($"{include.emoji.SHOUZHI}\"查询物种总览\" 查看详情");
+                //}
             }
             if (exceedCount > 0)
             {
                 if (desc.Count > 0) desc.Add("");
                 desc.Add($"共{exceedCount}人已超时");
-                if (lackCount <= 20) desc.AddRange(listExceed);
-                else
-                {
-                    desc.Add($"人太多了，请按以下提示操作：");
-                    desc.Add($"{include.emoji.SHOUZHI}\"查询物种总览\" 查看详情");
-                }
+                /*if (lackCount <= 20)*/
+                desc.AddRange(listExceed);
+                //else
+                //{
+                //    desc.Add($"人太多了，请按以下提示操作：");
+                //    desc.Add($"{include.emoji.SHOUZHI}\"查询物种总览\" 查看详情");
+                //}
             }
 
             if (desc.Count == 0) desc.Add("大家都在好好挖矿~");
@@ -2112,13 +2155,12 @@ namespace RS.Snail.JJJ.robot.modules
         /// <summary>
         /// 查询挖矿到期
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <param name="near"></param>
         /// <returns></returns>
-        public string QueryGroupWarMineNear(string robotWxid, string rid, double near = 0.5)
+        public string QueryGroupWarMineNear(string rid, double near = 0.5)
         {
-            var club = FindClub(robotWxid, rid);
+            var club = FindClub(rid);
             if (club is null) return null;
             if (!club.IsTodayUpdated()) return "今天还没更新过物种数据，请先登录一次再来查询";
 
@@ -2133,7 +2175,7 @@ namespace RS.Snail.JJJ.robot.modules
             {
                 if (item.Value >= now && item.Value - now <= nearSec)
                 {
-                    list.Add($"{QueryMemberName(robotWxid, item.Key)} → {TimeHelper.ChineseTimeDescWithWeekday(item.Value)}");
+                    list.Add($"{QueryMemberName(item.Key)} → {TimeHelper.ChineseTimeDescWithWeekday(item.Value)}");
                     nearCount++;
                 }
             }
@@ -2142,15 +2184,15 @@ namespace RS.Snail.JJJ.robot.modules
             {
                 if (desc.Count > 0) desc.Add("");
                 desc.Add($"共{nearCount}人将在{near:N2}小时内超时");
-                if (nearCount <= 20)
-                {
-                    desc.AddRange(list);
-                }
-                else
-                {
-                    desc.Add($"人太多了，请按以下提示操作：");
-                    desc.Add($"{include.emoji.SHOUZHI}\"查询物种总览\" 查看详情");
-                }
+                //if (nearCount <= 20)
+                //{
+                desc.AddRange(list);
+                //}
+                //else
+                //{
+                //    desc.Add($"人太多了，请按以下提示操作：");
+                //    desc.Add($"{include.emoji.SHOUZHI}\"查询物种总览\" 查看详情");
+                //}
             }
 
             if (desc.Count == 0) desc.Add("大家都在好好挖矿~");
@@ -2160,13 +2202,12 @@ namespace RS.Snail.JJJ.robot.modules
         /// <summary>
         /// 我的矿
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <param name="uid"></param>
         /// <returns></returns>
-        public string? QueryGroupWarMineMine(string robotWxid, string rid, Group group, string wxid)
+        public string? QueryGroupWarMineMine(string rid, Group group, string wxid)
         {
-            var club = FindClub(robotWxid, rid);
+            var club = FindClub(rid);
             if (club is null) return null;
 
             if (group is null) return null;
@@ -2176,31 +2217,35 @@ namespace RS.Snail.JJJ.robot.modules
 
             if (groupMember.UIDs is null || groupMember.UIDs.Count <= 0) return null;
 
+            var weekday = RS.Snail.JJJ.Client.core.game.module.TimeM.GetWeekDayStatic();
+            if (weekday == 5) return "周五就好好休息，别管挖矿啦。";
+
             var now = TimeHelper.ToTimeStamp();
+
             var desc = new List<string>();
             foreach (var uid in groupMember.UIDs)
             {
-                var member = FindMember(robotWxid, uid);
+                var member = FindMember(uid);
                 if (member is null) continue;
                 var dest = JSONHelper.ParseLong(member.Query("mine_dest"));
                 var destDesc = "";
-                if (dest == 0) destDesc = "正在跳矿或不在矿中";
-                else if (dest <= now) destDesc = $"已超时{TimeHelper.ChinsesTimeDurationDesc(now - dest)}";
-                else if (dest <= now + 86400) destDesc = $"还剩 {TimeHelper.ChinsesTimeDurationDesc(dest - now)}";
-                else destDesc = $"到期时间 {TimeHelper.ChineseTimeDescWithWeekday(dest)}";
+                if (dest == 0) destDesc = $"{emoji.YIWEN}正在跳矿或不在矿中";
+                else if (dest <= now) destDesc = $"{emoji.BAOZHA}已超时{TimeHelper.ChinsesTimeDurationDesc(now - dest)}";
+                else if (dest <= now + 86400) destDesc = $"{emoji.NAOZHONG}还剩{TimeHelper.ChinsesTimeDurationDesc(dest - now)}";
+                else destDesc = $"到期时间{TimeHelper.ChineseTimeDescWithWeekday(dest)}";
 
-                desc.Add($"[{member.NameOrUID()}]{destDesc}");
+                desc.Add($"[{member.NameOrUID()}]\n{destDesc}");
                 string pos = JSONHelper.ParseString(member.Query("mine_pos"));
                 if (!string.IsNullOrEmpty(pos))
                 {
-                    desc.Add($"位置：{pos}");
+                    desc.Add($"{emoji.LOCATION}位置：{pos}");
                     var others = QueryAtSameMinePos(club, pos);
                     if (others.Contains(uid)) others.Remove(uid);
-                    if (others.Count == 0) desc.Add("一人一矿");
+                    if (others.Count == 0) desc.Add($"{emoji.OK}一人一矿");
                     else
                     {
 
-                        desc.Add($"还有{string.Join("，", others.Select(a => QueryMemberName(robotWxid, a)))}等{others.Count}人在此矿");
+                        desc.Add($"还有{string.Join("，", others.Select(a => QueryMemberName(a)))}等{others.Count}人在此矿");
                     }
                 }
             }
@@ -2214,12 +2259,11 @@ namespace RS.Snail.JJJ.robot.modules
         /// <summary>
         /// 查询未参与事件
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <returns></returns>
-        public string QueryGroupWarZeroMultiEvent(string robotWxid, string rid)
+        public string QueryGroupWarZeroMultiEvent(string rid)
         {
-            var club = FindClub(robotWxid, rid);
+            var club = FindClub(rid);
             if (club is null) return null;
             if (!club.IsTodayUpdated()) return "今天还没更新过物种数据，请先登录一次再来查询";
 
@@ -2231,11 +2275,8 @@ namespace RS.Snail.JJJ.robot.modules
             int lackMemberCount = 0;
             foreach (var item in data)
             {
-                if (item.Value > 0)
-                {
-                    lackMemberCount++;
-                    list.Add($"{QueryMemberName(robotWxid, item.Key)}");
-                }
+                lackMemberCount++;
+                list.Add($"{QueryMemberName(item.Key)}");
             }
             if (lackMemberCount == 0)
             {
@@ -2244,15 +2285,15 @@ namespace RS.Snail.JJJ.robot.modules
             else
             {
                 desc.Add($"{include.emoji.HAN}共{lackMemberCount}人还未做过事件");
-                if (lackMemberCount <= 20)
-                {
-                    desc.AddRange(list);
-                }
-                else
-                {
-                    desc.Add($"人太多了，请按以下提示操作：");
-                    desc.Add($"{include.emoji.SHOUZHI}\"查询物种总览\" 查看详情");
-                }
+                //if (lackMemberCount <= 20)
+                //{
+                desc.AddRange(list);
+                //}
+                //else
+                //{
+                //    desc.Add($"人太多了，请按以下提示操作：");
+                //    desc.Add($"{include.emoji.SHOUZHI}\"查询物种总览\" 查看详情");
+                //}
             }
 
             return string.Join("\n", desc);
@@ -2260,14 +2301,13 @@ namespace RS.Snail.JJJ.robot.modules
         /// <summary>
         /// 生成矿点表
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <returns></returns>
-        public string? GetGroupWarEventsMineImage(string robotWxid, string rid)
+        public string? GetGroupWarEventsMineImage(string rid)
         {
             try
             {
-                var club = FindClub(robotWxid, rid);
+                var club = FindClub(rid);
                 if (club is null) return null;
 
                 var clubName = club.Name;
@@ -2277,7 +2317,7 @@ namespace RS.Snail.JJJ.robot.modules
                 var dist = $"{include.club.ChannelTypeDesc(club.ChannelType)} 第{club.CombinedDistSort}大区";
 
                 var poses = new Dictionary<int, List<string>>();
-                var events = _context.GroupWarEventsM.QueryEvents(robotWxid, club.ChannelType, club.CombinedDistSort, club.GroupwarEventShareKey, type: JJJ.Client.core.game.include.group_war.GW_ELEMENT_TYPE_MINE);
+                var events = _context.GroupWarEventsM.QueryEvents(club.ChannelType, club.CombinedDistSort, club.GroupwarEventShareKey, type: JJJ.Client.core.game.include.group_war.GW_ELEMENT_TYPE_MINE);
                 if (events.Count > 0)
                 {
                     events.Sort((a, b) => a.Sort - b.Sort);
@@ -2288,28 +2328,27 @@ namespace RS.Snail.JJJ.robot.modules
                     }
                 }
 
-                return ImageHelper.GetEventMineImage(duration: duration,
+                return GWImageHelper.GetEventMineImage(duration: duration,
                                                      clubName: clubName,
                                                      distSort: dist,
                                                      poses: poses);
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, "ClubsM.GetClubKitPlanImage");
+                Context.Logger.WriteException(ex, "ClubsM.GetClubKitPlanImage");
                 return null;
             }
         }
         /// <summary>
         /// 生成事件表
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <returns></returns>
-        public string? GetGroupWarEventsMultiImage(string robotWxid, string rid)
+        public string? GetGroupWarEventsMultiImage(string rid)
         {
             try
             {
-                var club = FindClub(robotWxid, rid);
+                var club = FindClub(rid);
                 if (club is null) return null;
 
                 var clubName = club.Name;
@@ -2319,7 +2358,7 @@ namespace RS.Snail.JJJ.robot.modules
                 var dist = $"{include.club.ChannelTypeDesc(club.ChannelType)} 第{club.CombinedDistSort}大区";
 
                 var poses = new Dictionary<int, List<string>>();
-                var events = _context.GroupWarEventsM.QueryEvents(robotWxid, club.ChannelType, club.CombinedDistSort, club.GroupwarEventShareKey, type: JJJ.Client.core.game.include.group_war.GW_ELEMENT_TYPE_MULTI);
+                var events = _context.GroupWarEventsM.QueryEvents(club.ChannelType, club.CombinedDistSort, club.GroupwarEventShareKey, type: JJJ.Client.core.game.include.group_war.GW_ELEMENT_TYPE_MULTI);
                 if (events.Count > 0)
                 {
                     events.Sort((a, b) => a.Sort - b.Sort);
@@ -2331,7 +2370,7 @@ namespace RS.Snail.JJJ.robot.modules
                 }
 
                 var singles = new List<string>();
-                events = _context.GroupWarEventsM.QueryEvents(robotWxid, club.ChannelType, club.CombinedDistSort, club.GroupwarEventShareKey, type: JJJ.Client.core.game.include.group_war.GW_ELEMENT_TYPE_SINGLE);
+                events = _context.GroupWarEventsM.QueryEvents(club.ChannelType, club.CombinedDistSort, club.GroupwarEventShareKey, type: JJJ.Client.core.game.include.group_war.GW_ELEMENT_TYPE_SINGLE);
                 if (events.Count > 0)
                 {
                     events.Sort((a, b) => a.Sort - b.Sort);
@@ -2342,7 +2381,7 @@ namespace RS.Snail.JJJ.robot.modules
                     }
                 }
 
-                return ImageHelper.GetEventMultiImage(duration: duration,
+                return GWImageHelper.GetEventMultiImage(duration: duration,
                                                       clubName: clubName,
                                                       distSort: dist,
                                                       poses: poses,
@@ -2350,21 +2389,20 @@ namespace RS.Snail.JJJ.robot.modules
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, "ClubsM.GetGroupWarEventsMultiImage");
+                Context.Logger.WriteException(ex, "ClubsM.GetGroupWarEventsMultiImage");
                 return null;
             }
         }
         /// <summary>
         /// 生成boss表
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <returns></returns>
-        public string? GetGroupWarEventsBossImage(string robotWxid, string rid)
+        public string? GetGroupWarEventsBossImage(string rid)
         {
             try
             {
-                var club = FindClub(robotWxid, rid);
+                var club = FindClub(rid);
                 if (club is null) return null;
 
                 var clubName = club.Name;
@@ -2374,7 +2412,7 @@ namespace RS.Snail.JJJ.robot.modules
                 var dist = $"{include.club.ChannelTypeDesc(club.ChannelType)} 第{club.CombinedDistSort}大区";
 
                 var boss = new Dictionary<int, string>();
-                var events = _context.GroupWarEventsM.QueryEvents(robotWxid, club.ChannelType, club.CombinedDistSort, club.GroupwarEventShareKey, type: JJJ.Client.core.game.include.group_war.GW_ELEMENT_TYPE_BOSS);
+                var events = _context.GroupWarEventsM.QueryEvents(club.ChannelType, club.CombinedDistSort, club.GroupwarEventShareKey, type: JJJ.Client.core.game.include.group_war.GW_ELEMENT_TYPE_BOSS);
                 if (events.Count > 0)
                 {
                     events.Sort((a, b) => a.Sort - b.Sort);
@@ -2385,7 +2423,7 @@ namespace RS.Snail.JJJ.robot.modules
                 }
 
                 var monster = new Dictionary<int, List<string>>();
-                events = _context.GroupWarEventsM.QueryEvents(robotWxid, club.ChannelType, club.CombinedDistSort, club.GroupwarEventShareKey, type: JJJ.Client.core.game.include.group_war.GW_ELEMENT_TYPE_MONSTER);
+                events = _context.GroupWarEventsM.QueryEvents(club.ChannelType, club.CombinedDistSort, club.GroupwarEventShareKey, type: JJJ.Client.core.game.include.group_war.GW_ELEMENT_TYPE_MONSTER);
                 if (monster.Count > 0)
                 {
                     events.Sort((a, b) => a.SortMark - b.SortMark);
@@ -2396,7 +2434,7 @@ namespace RS.Snail.JJJ.robot.modules
                     }
                 }
 
-                return ImageHelper.GetEventBossImage(duration: duration,
+                return GWImageHelper.GetEventBossImage(duration: duration,
                                                       clubName: clubName,
                                                       distSort: dist,
                                                       monster: monster,
@@ -2404,21 +2442,20 @@ namespace RS.Snail.JJJ.robot.modules
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, "ClubsM.GetGroupWarEventsBossImage");
+                Context.Logger.WriteException(ex, "ClubsM.GetGroupWarEventsBossImage");
                 return null;
             }
         }
         /// <summary>
         /// 生成事件总表
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <returns></returns>
-        public string? GetGroupWarEventsSumImage(string robotWxid, string rid)
+        public string? GetGroupWarEventsSumImage(string rid)
         {
             try
             {
-                var club = FindClub(robotWxid, rid);
+                var club = FindClub(rid);
                 if (club is null) return null;
 
                 var clubName = club.Name;
@@ -2428,7 +2465,7 @@ namespace RS.Snail.JJJ.robot.modules
                 var dist = $"{include.club.ChannelTypeDesc(club.ChannelType)} 第{club.CombinedDistSort}大区";
 
                 var boss = new Dictionary<int, string>();
-                var events = _context.GroupWarEventsM.QueryEvents(robotWxid, club.ChannelType, club.CombinedDistSort, club.GroupwarEventShareKey, type: JJJ.Client.core.game.include.group_war.GW_ELEMENT_TYPE_BOSS);
+                var events = _context.GroupWarEventsM.QueryEvents(club.ChannelType, club.CombinedDistSort, club.GroupwarEventShareKey, type: JJJ.Client.core.game.include.group_war.GW_ELEMENT_TYPE_BOSS);
                 if (events.Count > 0)
                 {
                     events.Sort((a, b) => a.Sort - b.Sort);
@@ -2439,7 +2476,7 @@ namespace RS.Snail.JJJ.robot.modules
                 }
 
                 var monster = new Dictionary<int, List<string>>();
-                events = _context.GroupWarEventsM.QueryEvents(robotWxid, club.ChannelType, club.CombinedDistSort, club.GroupwarEventShareKey, type: JJJ.Client.core.game.include.group_war.GW_ELEMENT_TYPE_MONSTER);
+                events = _context.GroupWarEventsM.QueryEvents(club.ChannelType, club.CombinedDistSort, club.GroupwarEventShareKey, type: JJJ.Client.core.game.include.group_war.GW_ELEMENT_TYPE_MONSTER);
                 if (events.Count > 0)
                 {
                     events.Sort((a, b) => a.SortMark - b.SortMark);
@@ -2451,7 +2488,7 @@ namespace RS.Snail.JJJ.robot.modules
                 }
 
                 var multis = new Dictionary<int, List<string>>();
-                events = _context.GroupWarEventsM.QueryEvents(robotWxid, club.ChannelType, club.CombinedDistSort, club.GroupwarEventShareKey, type: JJJ.Client.core.game.include.group_war.GW_ELEMENT_TYPE_MULTI);
+                events = _context.GroupWarEventsM.QueryEvents(club.ChannelType, club.CombinedDistSort, club.GroupwarEventShareKey, type: JJJ.Client.core.game.include.group_war.GW_ELEMENT_TYPE_MULTI);
                 if (events.Count > 0)
                 {
                     events.Sort((a, b) => a.Sort - b.Sort);
@@ -2463,7 +2500,7 @@ namespace RS.Snail.JJJ.robot.modules
                 }
 
                 var singles = new List<string>();
-                events = _context.GroupWarEventsM.QueryEvents(robotWxid, club.ChannelType, club.CombinedDistSort, club.GroupwarEventShareKey, type: JJJ.Client.core.game.include.group_war.GW_ELEMENT_TYPE_SINGLE);
+                events = _context.GroupWarEventsM.QueryEvents(club.ChannelType, club.CombinedDistSort, club.GroupwarEventShareKey, type: JJJ.Client.core.game.include.group_war.GW_ELEMENT_TYPE_SINGLE);
                 if (events.Count > 0)
                 {
                     events.Sort((a, b) => a.Sort - b.Sort);
@@ -2475,7 +2512,7 @@ namespace RS.Snail.JJJ.robot.modules
                 }
 
                 var mines = new Dictionary<int, List<string>>();
-                events = _context.GroupWarEventsM.QueryEvents(robotWxid, club.ChannelType, club.CombinedDistSort, club.GroupwarEventShareKey, type: JJJ.Client.core.game.include.group_war.GW_ELEMENT_TYPE_MINE);
+                events = _context.GroupWarEventsM.QueryEvents(club.ChannelType, club.CombinedDistSort, club.GroupwarEventShareKey, type: JJJ.Client.core.game.include.group_war.GW_ELEMENT_TYPE_MINE);
                 if (events.Count > 0)
                 {
                     events.Sort((a, b) => a.Sort - b.Sort);
@@ -2486,7 +2523,7 @@ namespace RS.Snail.JJJ.robot.modules
                     }
                 }
 
-                return ImageHelper.GetEvenSumImage(duration: duration,
+                return GWImageHelper.GetEvenSumImage(duration: duration,
                                                    clubName: clubName,
                                                    distSort: dist,
                                                    monster: monster.ToDictionary(a => a.Key, a => string.Join(" | ", a.Value)),
@@ -2497,7 +2534,7 @@ namespace RS.Snail.JJJ.robot.modules
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, "ClubsM.GetGroupWarEventsBossImage");
+                Context.Logger.WriteException(ex, "ClubsM.GetGroupWarEventsBossImage");
                 return null;
             }
         }
@@ -2507,24 +2544,24 @@ namespace RS.Snail.JJJ.robot.modules
         /// <summary>
         /// 查询我的套装
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="chatroom"></param>
         /// <param name="wxid"></param>
         /// <returns></returns>
-        public string? QueryMyKit(string robotWxid, string chatroom, string wxid)
+        public string? QueryMyKit(string chatroom, string wxid)
         {
-            var user = _context.ContactsM.FindGroupMember(robotWxid, chatroom, wxid);
+            var user = _context.ContactsM.FindGroupMember(chatroom, wxid);
+            if (user is null) return "";
             var uids = user.UIDs;
             if (uids is null || uids.Count == 0) return null;
             var ret = new List<string>();
             foreach (var uid in uids)
             {
-                var member = FindMember(robotWxid, uid);
+                var member = FindMember(uid);
                 if (member is null) continue;
 
                 var kitLocked = member.KitLocked;
-                if (kitLocked != Kit.UNDEFINED) ret.Add($"[{member.NameOrUID}]  锁定套装[{include.club.KitDesc(kitLocked)}]，分配套装[{include.club.KitDesc(member.KitAlloc)}]，领取套装[{include.club.KitDesc(member.Kit)}]");
-                else ret.Add($"[{member.NameOrUID}] 分配套装[{include.club.KitDesc(member.KitAlloc)}]，领取套装[{include.club.KitDesc(member.Kit)}]");
+                if (kitLocked != Kit.UNDEFINED) ret.Add($"[{member.NameOrUID()}]  锁定套装[{include.club.KitDesc(kitLocked)}]，分配套装[{include.club.KitDesc(member.KitAlloc)}]，领取套装[{include.club.KitDesc(member.Kit)}]");
+                else ret.Add($"[{member.NameOrUID()}] 分配套装[{include.club.KitDesc(member.KitAlloc)}]，领取套装[{include.club.KitDesc(member.Kit)}]");
             }
 
             if (ret.Count == 0) return null;
@@ -2533,19 +2570,18 @@ namespace RS.Snail.JJJ.robot.modules
         /// <summary>
         /// 查询领错套装
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <returns></returns>
-        public string? QueryIncorrectKit(string robotWxid, string rid)
+        public string? QueryIncorrectKit(string rid)
         {
-            var club = FindClub(robotWxid, rid);
+            var club = FindClub(rid);
             if (club is null) return null;
             if (!RS.Snail.JJJ.Client.core.game.module.TimeM.IsSameDurationStatic(TimeHelper.ToTimeStamp(), club.KitPlanTime, 7 * 86400)) return $"本周还没有分配过套装\n{include.emoji.SHOUZHI}\"生成布阵图\"立即分配套装";
 
             var desc = new List<(string content, long kitTime)>();
             foreach (var uid in club.Members)
             {
-                var member = FindMember(robotWxid, uid);
+                var member = FindMember(uid);
                 if (member is null) continue;
                 if (member.Kit == Kit.UNDEFINED || member.Kit != member.KitAlloc)
                 {
@@ -2559,35 +2595,34 @@ namespace RS.Snail.JJJ.robot.modules
             }
             else
             {
-                if (desc.Count > 20)
+                //if (desc.Count > 20)
+                //{
+                //    return $"共{desc.Count}人没领或领错套装，人太多啦\n{include.emoji.SHOUZHI}\"查询物种总览\" 查看详情";
+                //}
+                //else
+                //{
+                desc.Sort((a, b) =>
                 {
-                    return $"共{desc.Count}人没领或领错套装，人太多啦\n{include.emoji.SHOUZHI}\"查询物种总览\" 查看详情";
-                }
-                else
-                {
-                    desc.Sort((a, b) =>
-                    {
-                        if (a.kitTime < b.kitTime) return -1;
-                        else if (a.kitTime == b.kitTime) return 0;
-                        else return 1;
-                    });
-                    return $"共{desc.Count}人没领或领错套装\n{string.Join("\n", desc)}";
-                }
+                    if (a.kitTime < b.kitTime) return -1;
+                    else if (a.kitTime == b.kitTime) return 0;
+                    else return 1;
+                });
+                return $"共{desc.Count}人没领或领错套装\n{string.Join("\n", desc)}";
+                //}
             }
         }
         /// <summary>
         /// 设置锁定套装
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <param name="uid"></param>
         /// <param name="kit"></param>
         /// <returns></returns>
-        public (bool result, string? desc) SetClubMemberLockedKit(string robotWxid, string rid, string uid, Kit kit)
+        public (bool result, string? desc) SetClubMemberLockedKit(string rid, string uid, Kit kit)
         {
-            var member = FindMember(robotWxid, uid);
+            var member = FindMember(uid);
             if (member is null) return (false, $"未找到成员 [{uid}]");
-            var club = FindClub(robotWxid, rid);
+            var club = FindClub(rid);
             if (club is null) return (false, $"未找到俱乐部 [{rid}]");
 
             // 检查套装分配是否超出数量
@@ -2596,7 +2631,7 @@ namespace RS.Snail.JJJ.robot.modules
                 var count = 0;
                 foreach (var _uid in club.Members)
                 {
-                    var _member = FindMember(robotWxid, _uid);
+                    var _member = FindMember(_uid);
                     if (_member is null) continue;
                     if (_member.KitLocked == kit) count++;
                     if (count >= 25) return (false, $"你要设置的套装 [{include.club.KitDesc(kit)}] 在本俱乐部内已有25人锁定，请选择其他套装");
@@ -2604,25 +2639,24 @@ namespace RS.Snail.JJJ.robot.modules
             }
             member.KitLocked = kit;
 
-            if (kit == Kit.UNDEFINED) return (true, $" [{member.NameOrUID}] 已清除锁定套装设置\n" +
+            if (kit == Kit.UNDEFINED) return (true, $" [{member.NameOrUID()}] 已清除锁定套装设置\n" +
                                                     $"从下一次分派套装开始，该成员将根据相应数据排行分配套装。");
-            else return (true, $" [{member.NameOrUID}] 锁定套装 [{include.club.KitDesc(kit)}]\n" +
+            else return (true, $" [{member.NameOrUID()}] 锁定套装 [{include.club.KitDesc(kit)}]\n" +
                                $"从下一次分派套装开始，该成员的套装将被锁定。");
         }
         /// <summary>
         /// 生成布阵图
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <returns></returns>
-        public string? GetClubKitPlanImage(string robotWxid, string rid)
+        public string? GetClubKitPlanImage(string rid, bool force = false)
         {
             try
             {
-                var club = FindClub(robotWxid, rid);
+                var club = FindClub(rid);
                 if (club is null) return null;
 
-                CalcKitPlan(club);
+                CalcKitPlan(club, force);
 
                 var clubName = club.Name;
                 var race = club.Map;
@@ -2630,18 +2664,25 @@ namespace RS.Snail.JJJ.robot.modules
                 var duration = $"{TimeHelper.SimpleTimeDescJustDate(RS.Snail.JJJ.Client.core.game.module.TimeM.GetGWWeekStartTimeStatic(now))} - " +
                                $"{TimeHelper.SimpleTimeDescJustDate(RS.Snail.JJJ.Client.core.game.module.TimeM.GetGWWeekEndTimeStatic(now))}";
                 Dictionary<Kit, List<(string uid, int index)>> names = new();
+                var locks = new List<string>();
 
                 foreach (var uid in club.Members)
                 {
-                    var member = FindMember(robotWxid, uid);
+                    var member = FindMember(uid);
                     if (member is null) continue;
 
                     var kit = member.KitAlloc;
                     if (!names.ContainsKey(kit)) names.Add(kit, new());
 
-                    var kitLocked = member.KitLocked;
-                    if (kitLocked != Kit.UNDEFINED) names[kit].Add(($"{member.NameOrUID()} [已锁定]", JSONHelper.ParseInt(member.Query("kit_index"))));
-                    else names[kit].Add((member.NameOrUID(), JSONHelper.ParseInt(member.Query("kit_index"))));
+                    var memberName = member.NameOrUID();
+
+                    if (member.KitLocked != Kit.UNDEFINED) memberName += " [已锁定]";
+                    else if (club.KitImageShowValue) memberName += $" [{member.Query("kit_value")}]";
+
+                    if (member.KitLocked != Kit.UNDEFINED) names[kit].Add((memberName, JSONHelper.ParseInt(member.Query("kit_index"))));
+                    else names[kit].Add((memberName, JSONHelper.ParseInt(member.Query("kit_index"))));
+
+                    if (member.KitLocked != Kit.UNDEFINED) locks.Add(memberName);
                 }
 
                 foreach (var item in names)
@@ -2649,19 +2690,19 @@ namespace RS.Snail.JJJ.robot.modules
                     item.Value.Sort((a, b) => b.index - a.index);
                 }
                 // 将names 转换为字典，Key不变，Value取uid列表
+                string type = include.club.ClubKitPlanTypeDesc(club.ClubKitPlanType == ClubKitPlanType.UNDEFINED ? ClubKitPlanType.SONCOMBAT : club.ClubKitPlanType);
 
-                string type = include.club.ClubKitPlanTypeDesc(club.ClubKitPlanType);
 
-
-                return ImageHelper.GetClubKitPlanImage(race: race,
+                return GWImageHelper.GetClubKitPlanImage(race: race,
                                                        type: type,
                                                        clubName: clubName,
                                                        duration: duration,
-                                                       names: names.ToDictionary(x => x.Key, x => x.Value.Select(y => y.uid).ToList()));
+                                                       names: names.ToDictionary(x => x.Key, x => x.Value.Select(y => y.uid).ToList()),
+                                                       locks: locks);
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, "ClubsM.GetClubKitPlanImage");
+                Context.Logger.WriteException(ex, "ClubsM.GetClubKitPlanImage");
                 return null;
             }
         }
@@ -2671,14 +2712,13 @@ namespace RS.Snail.JJJ.robot.modules
         /// <summary>
         /// 提醒挖矿
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <param name="near"></param>
         /// <returns></returns>
-        public (bool result, string? desc) RemindGroupWarMine(string robotWxid, string rid, string chatroom, string sender, double near = 0.5)
+        public (bool result, string? desc) RemindGroupWarMine(string rid, string chatroom, string sender, double near = 0.5)
         {
             var ret = new List<(List<string> wxids, string content)>();
-            var club = FindClub(robotWxid, rid);
+            var club = FindClub(rid);
             if (club is null) return (false, "未找到俱乐部");
             if (!club.IsTodayUpdated()) return (false, "今天还没更新过物种数据，请先登录一次再发起提醒");
             var weekday = RS.Snail.JJJ.Client.core.game.module.TimeM.GetWeekDayStatic();
@@ -2695,22 +2735,21 @@ namespace RS.Snail.JJJ.robot.modules
         /// <summary>
         /// 提醒金牌
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <param name="chatroom"></param>
         /// <param name="sender"></param>
         /// <returns></returns>
-        public (bool result, string? desc) RemindGroupWarTokenGold(string robotWxid, string rid, string chatroom, string sender)
+        public (bool result, string? desc) RemindGroupWarTokenGold(string rid, string chatroom, string sender)
         {
             var ret = new List<(List<string> wxids, string content)>();
-            var club = FindClub(robotWxid, rid);
+            var club = FindClub(rid);
             if (club is null) return (false, "未找到俱乐部");
             if (!club.IsTodayUpdated()) return (false, "今天还没更新过物种数据，请先登录一次再发起提醒");
             var weekday = RS.Snail.JJJ.Client.core.game.module.TimeM.GetWeekDayStatic();
             if (weekday == 5) return (false, "周五就不要提醒啦~");
 
             var data = QueryGroupWarTokenGoldRemind(club, include.TokenQueryType.LACK);
-            data = CombineRemindDic(data, QueryGroupWarTokenGoldRemind(club, include.TokenQueryType.NOT_USE));
+            data = CombineRemindDic(data, QueryGroupWarTokenGoldRemind(club, include.TokenQueryType.NOT_USE), club.RemindContentNotCombine ? "" : $"{include.emoji.GOLD}金牌没领");
             if (data.Count > ClubRemidMaxCount(club)) return (false, "要发出的提醒太多，建议直接@所有人");
 
             var result = SendRemindContent(club, data, chatroom, sender);
@@ -2720,15 +2759,14 @@ namespace RS.Snail.JJJ.robot.modules
         /// <summary>
         /// 提醒氪金牌
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <param name="chatroom"></param>
         /// <param name="sender"></param>
         /// <returns></returns>
-        public (bool result, string? desc) RemindGroupWarTokenGoldNotBuy(string robotWxid, string rid, string chatroom, string sender)
+        public (bool result, string? desc) RemindGroupWarTokenGoldNotBuy(string rid, string chatroom, string sender)
         {
             var ret = new List<(List<string> wxids, string content)>();
-            var club = FindClub(robotWxid, rid);
+            var club = FindClub(rid);
             if (club is null) return (false, "未找到俱乐部");
             if (!club.IsTodayUpdated()) return (false, "今天还没更新过物种数据，请先登录一次再发起提醒");
             var weekday = RS.Snail.JJJ.Client.core.game.module.TimeM.GetWeekDayStatic();
@@ -2744,15 +2782,14 @@ namespace RS.Snail.JJJ.robot.modules
         /// <summary>
         /// 提醒氪金牌
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <param name="chatroom"></param>
         /// <param name="sender"></param>
         /// <returns></returns>
-        public (bool result, string? desc) RemindGroupWarTokenGoldLeft(string robotWxid, string rid, string chatroom, string sender)
+        public (bool result, string? desc) RemindGroupWarTokenGoldLeft(string rid, string chatroom, string sender)
         {
             var ret = new List<(List<string> wxids, string content)>();
-            var club = FindClub(robotWxid, rid);
+            var club = FindClub(rid);
             if (club is null) return (false, "未找到俱乐部");
             if (!club.IsTodayUpdated()) return (false, "今天还没更新过物种数据，请先登录一次再发起提醒");
             var weekday = RS.Snail.JJJ.Client.core.game.module.TimeM.GetWeekDayStatic();
@@ -2768,22 +2805,21 @@ namespace RS.Snail.JJJ.robot.modules
         /// <summary>
         /// 提醒银牌
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <param name="chatroom"></param>
         /// <param name="sender"></param>
         /// <returns></returns>
-        public (bool result, string? desc) RemindGroupWarTokenSilver(string robotWxid, string rid, string chatroom, string sender)
+        public (bool result, string? desc) RemindGroupWarTokenSilver(string rid, string chatroom, string sender)
         {
             var ret = new List<(List<string> wxids, string content)>();
-            var club = FindClub(robotWxid, rid);
+            var club = FindClub(rid);
             if (club is null) return (false, "未找到俱乐部");
             if (!club.IsTodayUpdated()) return (false, "今天还没更新过物种数据，请先登录一次再发起提醒");
             var weekday = RS.Snail.JJJ.Client.core.game.module.TimeM.GetWeekDayStatic();
             if (weekday == 5) return (false, "周五就不要提醒啦~");
 
             var data = QueryGroupWarTokenSilverRemind(club, include.TokenQueryType.LACK);
-            data = CombineRemindDic(data, QueryGroupWarTokenGoldRemind(club, include.TokenQueryType.NOT_USE));
+            data = CombineRemindDic(data, QueryGroupWarTokenSilverRemind(club, include.TokenQueryType.NOT_USE), club.RemindContentNotCombine ? "" : $"{include.emoji.SILVER}银牌没领");
             if (data.Count > ClubRemidMaxCount(club)) return (false, "要发出的提醒太多，建议直接@所有人");
 
             var result = SendRemindContent(club, data, chatroom, sender);
@@ -2793,15 +2829,14 @@ namespace RS.Snail.JJJ.robot.modules
         /// <summary>
         /// 提醒氪银牌
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <param name="chatroom"></param>
         /// <param name="sender"></param>
         /// <returns></returns>
-        public (bool result, string? desc) RemindGroupWarTokenSilverNotBuy(string robotWxid, string rid, string chatroom, string sender)
+        public (bool result, string? desc) RemindGroupWarTokenSilverNotBuy(string rid, string chatroom, string sender)
         {
             var ret = new List<(List<string> wxids, string content)>();
-            var club = FindClub(robotWxid, rid);
+            var club = FindClub(rid);
             if (club is null) return (false, "未找到俱乐部");
             if (!club.IsTodayUpdated()) return (false, "今天还没更新过物种数据，请先登录一次再发起提醒");
             var weekday = RS.Snail.JJJ.Client.core.game.module.TimeM.GetWeekDayStatic();
@@ -2818,15 +2853,14 @@ namespace RS.Snail.JJJ.robot.modules
         /// <summary>
         /// 提醒清银牌
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <param name="chatroom"></param>
         /// <param name="sender"></param>
         /// <returns></returns>
-        public (bool result, string? desc) RemindGroupWarTokenSilverLeft(string robotWxid, string rid, string chatroom, string sender)
+        public (bool result, string? desc) RemindGroupWarTokenSilverLeft(string rid, string chatroom, string sender)
         {
             var ret = new List<(List<string> wxids, string content)>();
-            var club = FindClub(robotWxid, rid);
+            var club = FindClub(rid);
             if (club is null) return (false, "未找到俱乐部");
             if (!club.IsTodayUpdated()) return (false, "今天还没更新过物种数据，请先登录一次再发起提醒");
             var weekday = RS.Snail.JJJ.Client.core.game.module.TimeM.GetWeekDayStatic();
@@ -2844,15 +2878,14 @@ namespace RS.Snail.JJJ.robot.modules
         /// 提醒钻头
         /// 周四提示未达标
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <param name="chatroom"></param>
         /// <param name="sender"></param>
         /// <returns></returns>
-        public (bool result, string? desc) RemindGroupWarDrill(string robotWxid, string rid, string chatroom, string sender, int min = 0, string notice = "")
+        public (bool result, string? desc) RemindGroupWarDrill(string rid, string chatroom, string sender, int min = 0, string notice = "")
         {
             var ret = new List<(List<string> wxids, string content)>();
-            var club = FindClub(robotWxid, rid);
+            var club = FindClub(rid);
             if (club is null) return (false, "未找到俱乐部");
             if (!club.IsTodayUpdated()) return (false, "今天还没更新过物种数据，请先登录一次再发起提醒");
             var weekday = RS.Snail.JJJ.Client.core.game.module.TimeM.GetWeekDayStatic();
@@ -2870,15 +2903,14 @@ namespace RS.Snail.JJJ.robot.modules
         /// <summary>
         /// 提醒物种历史
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <param name="chatroom"></param>
         /// <param name="sender"></param>
         /// <returns></returns>
-        public (bool result, string? desc) RemindGroupWarHistory(string robotWxid, string rid, string chatroom, string sender)
+        public (bool result, string? desc) RemindGroupWarHistory(string rid, string chatroom, string sender)
         {
             var ret = new List<(List<string> wxids, string content)>();
-            var club = FindClub(robotWxid, rid);
+            var club = FindClub(rid);
             if (club is null) return (false, "未找到俱乐部");
             if (!club.IsTodayUpdated()) return (false, "今天还没更新过物种数据，请先登录一次再发起提醒");
             var weekday = RS.Snail.JJJ.Client.core.game.module.TimeM.GetWeekDayStatic();
@@ -2895,32 +2927,62 @@ namespace RS.Snail.JJJ.robot.modules
         /// 提醒清资源 周四可用
         /// 金牌、银牌、钻头、挖矿、历史
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <param name="chatroom"></param>
         /// <param name="sender"></param>
         /// <param name="min"></param>
         /// <returns></returns>
-        public (bool result, string? desc) RemindGroupWarUseResources(string robotWxid, string rid, string chatroom, string sender)
+        public (bool result, string? desc) RemindGroupWarUseResources(string rid, string chatroom, string sender)
         {
             var ret = new List<(List<string> wxids, string content)>();
-            var club = FindClub(robotWxid, rid);
+            var club = FindClub(rid);
             if (club is null) return (false, "未找到俱乐部");
             if (!club.IsTodayUpdated()) return (false, "今天还没更新过物种数据，请先登录一次再发起提醒");
             var weekday = RS.Snail.JJJ.Client.core.game.module.TimeM.GetWeekDayStatic();
             if (weekday != 4) return (false, "此命令仅周四可用，请谨慎使用");
 
-            var data = QueryGroupWarTokenSilverRemind(club, TokenQueryType.NOT_USE);
-            data = CombineRemindDic(data, QueryGroupWarTokenSilverRemind(club, TokenQueryType.LACK));
-            data = CombineRemindDic(data, QueryGroupWarTokenGoldRemind(club, TokenQueryType.NOT_USE));
-            data = CombineRemindDic(data, QueryGroupWarTokenGoldRemind(club, TokenQueryType.LACK));
-            data = CombineRemindDic(data, QueryGroupWarDrillRemind(club, include.DrillQueryType.NOT_USE));
-            data = CombineRemindDic(data, QueryGroupWarDrillRemind(club, include.DrillQueryType.LACK));
-            data = CombineRemindDic(data, QueryGroupWarMineRemind(club));
-            data = CombineRemindDic(data, QueryGroupWarHistoryRemind(club));
+            var data = new Dictionary<string, List<string>>();
 
-            //if (data.Count > ClubRemidMaxCount(club)) return (false, "要发出的提醒太多，建议直接@所有人");
+            #region SILVER
+            // 银牌未领
+            var queryData = QueryGroupWarTokenSilverRemind(club, TokenQueryType.LACK);
+            data = CombineRemindDic(data, queryData);
 
+            // 银牌未用
+            queryData = QueryGroupWarTokenSilverRemind(club, TokenQueryType.LACK);
+            string excludeDesc = club.RemindContentNotCombine ? "" : $"{include.emoji.SILVER}银牌没领";
+            data = CombineRemindDic(data, queryData, excludeDesc);
+            #endregion
+
+            #region GOLD
+            // 金牌未领
+            queryData = QueryGroupWarTokenGoldRemind(club, TokenQueryType.LACK);
+            data = CombineRemindDic(data, queryData);
+
+            // 金牌未用
+            queryData = QueryGroupWarTokenGoldRemind(club, TokenQueryType.NOT_USE);
+            excludeDesc = club.RemindContentNotCombine ? "" : $"{include.emoji.GOLD}金牌没领";
+            data = CombineRemindDic(data, queryData, excludeDesc);
+            #endregion
+
+            #region DRILL
+            //// 钻头未达标
+            //queryData = QueryGroupWarDrillRemind(club, DrillQueryType.LACK);
+            //data = CombineRemindDic(data, queryData);
+
+            // 钻头未用
+            queryData = QueryGroupWarTokenGoldRemind(club, TokenQueryType.NOT_USE);
+            excludeDesc = club.RemindContentNotCombine ? "" : $"{include.emoji.GOLD}金牌没领";
+            data = CombineRemindDic(data, queryData, excludeDesc);
+            #endregion
+
+            // 挖矿
+            queryData = QueryGroupWarMineRemind(club);
+            data = CombineRemindDic(data, queryData);
+
+            // 历史
+            queryData = QueryGroupWarHistoryRemind(club);
+            data = CombineRemindDic(data, queryData);
             var result = SendRemindContent(club, data, chatroom, sender);
 
             return (result, null);
@@ -2931,20 +2993,19 @@ namespace RS.Snail.JJJ.robot.modules
         /// 仅周四可用
         /// 数量无限制
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <param name="chatroom"></param>
         /// <param name="sender"></param>
         /// <param name="min"></param>
         /// <returns></returns>
-        public (bool result, string? desc) RemindGroupWarGetResources(string robotWxid, string rid, string chatroom, string sender)
+        public (bool result, string? desc) RemindGroupWarGetResources(string rid, string chatroom, string sender)
         {
             var ret = new List<(List<string> wxids, string content)>();
-            var club = FindClub(robotWxid, rid);
+            var club = FindClub(rid);
             if (club is null) return (false, "未找到俱乐部");
             if (!club.IsTodayUpdated()) return (false, "今天还没更新过物种数据，请先登录一次再发起提醒");
-            var weekday = RS.Snail.JJJ.Client.core.game.module.TimeM.GetWeekDayStatic();
-            if (weekday != 4) return (false, "此命令仅周四可用，请谨慎使用");
+            //var weekday = RS.Snail.JJJ.Client.core.game.module.TimeM.GetWeekDayStatic();
+            //if (weekday != 4) return (false, "此命令仅周四可用，请谨慎使用");
 
             var data = QueryGroupWarTokenSilverRemind(club, TokenQueryType.LACK);
             data = CombineRemindDic(data, QueryGroupWarTokenGoldRemind(club, TokenQueryType.LACK));
@@ -2957,32 +3018,49 @@ namespace RS.Snail.JJJ.robot.modules
             return (result, null);
         }
         /// <summary>
-        /// 登陆后提醒
+        /// 登录后提醒
         /// 金牌、银牌、钻头、挖矿、历史
         /// 数量无限制
         /// </summary>
-        /// <param name="robotWxid"></param>
         /// <param name="rid"></param>
         /// <param name="chatroom"></param>
         /// <param name="sender"></param>
         /// <param name="min"></param>
         /// <returns></returns>
-        public (bool result, string? desc) RemindAfterLogin(string robotWxid, string rid, string chatroom, string sender, int min = 0)
+        public (bool result, string? desc) RemindAfterLogin(string rid, string chatroom, string sender, Client.core.boot.Configuration config)
         {
             var weekday = RS.Snail.JJJ.Client.core.game.module.TimeM.GetWeekDayStatic();
+            var hour = DateTime.Now.Hour;
+
             var ret = new List<(List<string> wxids, string content)>();
-            var club = FindClub(robotWxid, rid);
+            var club = FindClub(rid);
             if (club is null) return (false, "未找到俱乐部");
             if (!club.IsTodayUpdated()) return (false, "今天还没更新过物种数据，请先登录一次再发起提醒");
+            Dictionary<string, List<string>> data = new();
 
-            var data = QueryGroupWarTokenSilverRemind(club, TokenQueryType.NOT_USE);
-            data = CombineRemindDic(data, QueryGroupWarTokenSilverRemind(club, TokenQueryType.LACK));
-            data = CombineRemindDic(data, QueryGroupWarTokenGoldRemind(club, TokenQueryType.NOT_USE));
-            data = CombineRemindDic(data, QueryGroupWarTokenGoldRemind(club, TokenQueryType.LACK));
-            if (weekday == 4) data = CombineRemindDic(data, QueryGroupWarDrillRemind(club, include.DrillQueryType.NOT_USE, min));
-            if (weekday == 4) data = CombineRemindDic(data, QueryGroupWarDrillRemind(club, include.DrillQueryType.LACK));
-            data = CombineRemindDic(data, QueryGroupWarMineRemind(club));
-            if (club.RemindContentContainsGroupWarHistory) data = CombineRemindDic(data, QueryGroupWarHistoryRemind(club));
+            if (config.RemindTokens)
+            {
+                if (weekday == 4) data = QueryGroupWarTokenSilverRemind(club, TokenQueryType.NOT_USE);
+                data = CombineRemindDic(data, QueryGroupWarTokenSilverRemind(club, TokenQueryType.LACK));
+                if (weekday == 4) data = CombineRemindDic(data, QueryGroupWarTokenGoldRemind(club, TokenQueryType.NOT_USE));
+                data = CombineRemindDic(data, QueryGroupWarTokenGoldRemind(club, TokenQueryType.LACK));
+            }
+
+            if (config.RemindMines)
+            {
+                data = CombineRemindDic(data, QueryGroupWarMineRemind(club));
+            }
+
+            if (config.RemindDrills)
+            {
+                data = CombineRemindDic(data, QueryGroupWarDrillRemind(club, include.DrillQueryType.NOT_USE));
+                data = CombineRemindDic(data, QueryGroupWarDrillRemind(club, include.DrillQueryType.LACK));
+            }
+
+            if (config.RemindGW)
+            {
+                data = CombineRemindDic(data, QueryGroupWarHistoryRemind(club, true));
+            }
 
             // if (data.Count > ClubRemidMaxCount(club)) return (false, "要发出的提醒太多，建议直接@所有人");
 
@@ -3014,7 +3092,7 @@ namespace RS.Snail.JJJ.robot.modules
 
             foreach (var uid in club.Members)
             {
-                var member = FindMember(club.RobotWXID, uid);
+                var member = FindMember(uid);
                 if (member is null) continue;
 
                 // score
@@ -3022,7 +3100,7 @@ namespace RS.Snail.JJJ.robot.modules
                 // count
                 // today_count
                 var _list = new List<string>();
-                if (JSONHelper.ParseInt(member.Query("gw/today_count") < 1))
+                if (JSONHelper.ParseInt(member.Query("gw/today_count")) < 1)
                 {
                     todayLack++;
                     _list.Add($"今天没打");
@@ -3048,16 +3126,16 @@ namespace RS.Snail.JJJ.robot.modules
                 desc.Add($"本周一共{totalLackMember}个人少打共{totalLack}次蜣螂历史");
 
 
-                if (list.Count < 20)
-                {
-                    desc.Add("详情如下");
-                    desc.AddRange(list);
-                    desc.Add($"{include.emoji.SHOUZHI}\"提醒物种历史\" 立刻提醒");
-                }
-                else
-                {
-                    desc.Add($"{include.emoji.HAN}由于人数过多，请发送\"查询物种总览\"查看详情");
-                }
+                //if (list.Count < 20)
+                //{
+                desc.Add("详情如下");
+                desc.AddRange(list);
+                desc.Add($"{include.emoji.SHOUZHI}\"提醒物种历史\" 立刻提醒");
+                //}
+                //else
+                //{
+                //    desc.Add($"{include.emoji.HAN}由于人数过多，请发送\"查询物种总览\"查看详情");
+                //}
             }
 
             return string.Join("\n", desc);
@@ -3085,7 +3163,7 @@ namespace RS.Snail.JJJ.robot.modules
 
             foreach (var uid in club.Members)
             {
-                var member = FindMember(club.RobotWXID, uid);
+                var member = FindMember(uid);
                 if (member is null) continue;
 
                 // today_bs
@@ -3141,28 +3219,29 @@ namespace RS.Snail.JJJ.robot.modules
                 if (todayLackMemer > 0 || todayBSMemer > 0) desc.Add($"今天共{todayLackMemer}人共少打{todayLack}次，共{todayBSMemer}人共鞭尸{todayBS}次");
                 if (totalLackMember > 0 || totalBSMemer > 0) desc.Add($"本周共{totalLackMember}人共少打{totalLack}次，共{totalBSMemer}人共鞭尸{totalBS}次");
 
-                if (list.Count < 10)
-                {
-                    desc.Add("详情如下");
-                    desc.AddRange(list);
-                    desc.Add($"{include.emoji.SHOUZHI}\"提醒物种历史\" 立刻提醒");
-                }
-                else
-                {
-                    desc.Add($"{include.emoji.HAN}由于人数过多，请发送\"查询物种总览\"查看详情");
-                }
+                //if (list.Count < 10)
+                //{
+                desc.Add("详情如下");
+                desc.AddRange(list);
+                desc.Add($"{include.emoji.SHOUZHI}\"提醒物种历史\" 立刻提醒");
+                //}
+                //else
+                //{
+                //    desc.Add($"{include.emoji.HAN}由于人数过多，请发送\"查询物种总览\"查看详情");
+                //}
             }
             desc.Add("");
 
             // 俱乐部战绩
 
-            var clubData = club.GroupWarData?.dbase ?? new JObject();
+            var clubData = club.GroupWarData?.dbase?.spe2_record ?? new JObject();
             if (JSONHelper.GetCount(clubData) <= 0) desc.Add("(战果记录空，每天22:00结算之后登录获取)");
             else
             {
                 foreach (var item in clubData)
                 {
                     var _weekday = JSONHelper.ParseInt(item.Name);
+                    if (_weekday <= 0 || _weekday > 7) continue;
                     var data = item.Value;
                     desc.Add($"---- {include.misc.WeekdayDesc(_weekday)}战绩 ----");
                     desc.Add(JSONHelper.ParseString(data.result));
@@ -3195,15 +3274,15 @@ namespace RS.Snail.JJJ.robot.modules
 
             foreach (var uid in club.Members)
             {
-                var member = FindMember(club.RobotWXID, uid);
+                var member = FindMember(uid);
                 if (member is null) continue;
 
                 var _list = new List<string>();
 
                 var _notUseToday = JSONHelper.ParseInt(member.Query("gw/not_use_today"));
                 var _notUseTotal = JSONHelper.ParseInt(member.Query("gw/not_use"));
-                var _lackToday = JSONHelper.ParseInt(member.Query("gw/lack_today"));
-                var _lackTotal = JSONHelper.ParseInt(member.Query("gw/lack"));
+                var _lackToday = JSONHelper.ParseInt(club.Spe3DontNeedBuyGem ? member.Query("gw/lack_today_not_buy") : member.Query("gw/lack_today"));
+                var _lackTotal = JSONHelper.ParseInt(club.Spe3DontNeedBuyGem ? member.Query("gw/lack_not_buy") : member.Query("gw/lack"));
                 var _isStarted = JSONHelper.ParseBool(member.Query("gw/is_started"));
                 var _isLate = JSONHelper.ParseLong(member.Query("gw/is_late"));
 
@@ -3263,16 +3342,16 @@ namespace RS.Snail.JJJ.robot.modules
                 if (notFetcTotalMember > 0 || notUseTotalMember > 0) desc.Add($"本周卷轴共{notFetcTotalMember}人共少领{notFetchTotaj}个，共{notUseTotalMember}人共少用{notUseTotal}个");
 
 
-                if (list.Count < 10)
-                {
-                    desc.Add("详情如下");
-                    desc.AddRange(list);
-                    desc.Add($"{include.emoji.SHOUZHI}\"提醒物种历史\" 立刻提醒");
-                }
-                else
-                {
-                    desc.Add($"{include.emoji.HAN}由于人数过多，请发送\"查询物种总览\"查看详情");
-                }
+                //if (list.Count < 10)
+                //{
+                desc.Add("详情如下");
+                desc.AddRange(list);
+                desc.Add($"{include.emoji.SHOUZHI}\"提醒物种历史\" 立刻提醒");
+                //}
+                //else
+                //{
+                //    desc.Add($"{include.emoji.HAN}由于人数过多，请发送\"查询物种总览\"查看详情");
+                //}
             }
 
             var clubData = club.GroupWarData?.dbase;
@@ -3307,7 +3386,7 @@ namespace RS.Snail.JJJ.robot.modules
 
             foreach (var uid in club.Members)
             {
-                var member = FindMember(club.RobotWXID, uid);
+                var member = FindMember(uid);
                 if (member is null) continue;
 
                 var _list = new List<string>();
@@ -3360,16 +3439,16 @@ namespace RS.Snail.JJJ.robot.modules
                 if (notAuction > 0) desc.Add($"今天共{notAuction}人未参与拍卖");
                 if (notSupply > 0) desc.Add($"今天共{notSupply}人未领补给");
 
-                if (list.Count < 10)
-                {
-                    desc.Add("详情如下");
-                    desc.AddRange(list);
-                    desc.Add($"{include.emoji.SHOUZHI}\"提醒物种历史\" 立刻提醒");
-                }
-                else
-                {
-                    desc.Add($"{include.emoji.HAN}由于人数过多，请发送\"查询物种总览\"查看详情");
-                }
+                //if (list.Count < 10)
+                //{
+                desc.Add("详情如下");
+                desc.AddRange(list);
+                desc.Add($"{include.emoji.SHOUZHI}\"提醒物种历史\" 立刻提醒");
+                //}
+                //else
+                //{
+                //    desc.Add($"{include.emoji.HAN}由于人数过多，请发送\"查询物种总览\"查看详情");
+                //}
             }
 
             desc.Add("---- 俱乐部信息 ----");
@@ -3395,7 +3474,7 @@ namespace RS.Snail.JJJ.robot.modules
 
             foreach (var uid in club.Members)
             {
-                var member = FindMember(club.RobotWXID, uid);
+                var member = FindMember(uid);
                 if (member is null) continue;
 
                 var _list = new List<string>();
@@ -3424,15 +3503,15 @@ namespace RS.Snail.JJJ.robot.modules
                 desc.Add($"今天共{lack}人未上擂台");
             }
 
-            if (list.Count < 10)
+            if (list.Count > 0)
             {
                 desc.Add("详情如下");
                 desc.AddRange(list);
             }
-            else
-            {
-                desc.Add($"{include.emoji.HAN}由于人数过多，请发送\"查询物种总览\"查看详情");
-            }
+            //else
+            //{
+            //    desc.Add($"{include.emoji.HAN}由于人数过多，请发送\"查询物种总览\"查看详情");
+            //}
 
             return string.Join("\n", desc);
         }
@@ -3461,6 +3540,7 @@ namespace RS.Snail.JJJ.robot.modules
             foreach (var dayItem in data)
             {
                 var weekday = JSONHelper.ParseInt(dayItem.Name);
+                if (weekday <= 0 || weekday > 7) continue;
                 var result = dayItem.Value;
                 result = result.result ?? new JObject();
                 var grids = JSONHelper.ParseStringList(result.won_grids);
@@ -3503,6 +3583,7 @@ namespace RS.Snail.JJJ.robot.modules
             foreach (var dayItem in data)
             {
                 var weekday = JSONHelper.ParseInt(dayItem.Name);
+                if (weekday <= 0 || weekday > 7) continue;
                 var clubs = dayItem.Value;
                 clubs = clubs.clubs ?? new JObject();
                 foreach (var _club in clubs)
@@ -3516,7 +3597,7 @@ namespace RS.Snail.JJJ.robot.modules
                         JSONHelper.ParseString(clubData.name),
                         JSONHelper.ParseInt(clubData.member_amount).ToString(),
                         JSONHelper.ParseInt(clubData.auction).ToString(),
-                        JSONHelper.ParseInt(clubData.total_score).ToString("N0"),
+                        JSONHelper.ParseLong(clubData.total_score).ToString("N0"),
                         JSONHelper.ParseString(clubs.server),
                     });
                 }
@@ -3548,24 +3629,50 @@ namespace RS.Snail.JJJ.robot.modules
             foreach (var dayItem in data)
             {
                 var weekday = JSONHelper.ParseInt(dayItem.Name);
+                if (weekday <= 0 || weekday > 7) continue;
                 var blocks = dayItem.Value;
                 blocks = blocks.blocks ?? new JObject();
                 foreach (var _club in blocks)
                 {
                     var pos = _club.Name;
                     var blockData = _club.Value;
+                    var totalCount = JSONHelper.ParseInt(blockData.total_count_detail);
                     ret.Add(new List<string>
                     {
                         include.misc.WeekdayDesc(weekday),
                         pos,
                         JSONHelper.ParseString(blockData.name),
                         JSONHelper.ParseInt(blockData.my_count).ToString(),
-                        isAdmin ? JSONHelper.ParseInt(blockData.total_count_detail).ToString():JSONHelper.ParseString(blockData.total_count),
+                        isAdmin ? totalCount.ToString(): GetSpecial4RangeDesc(totalCount),
                     });
                 }
 
             }
             return ret;
+        }
+        private string GetSpecial4RangeDesc(int num)
+        {
+            var str = "";
+            if (num <= 50)
+            {
+                var ranges = new List<int> { 10, 30, 50 };
+                int fixNum = 0;
+                for (int i = 0; i <= 2; i++)
+                {
+                    if (num <= ranges[i])
+                    {
+                        fixNum = ranges[i];
+                        str = $"<{fixNum}";
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                var fixNum = num - ((num - 1) % 50) - 1;
+                str = $">{fixNum}";
+            }
+            return str;
         }
         /// <summary>
         /// 查询银令牌列表
@@ -3580,7 +3687,7 @@ namespace RS.Snail.JJJ.robot.modules
 
             foreach (var uid in club.Members)
             {
-                var member = FindMember(club.RobotWXID, uid);
+                var member = FindMember(uid);
                 if (member is null) continue;
                 int count = 0;
                 switch (type)
@@ -3619,7 +3726,7 @@ namespace RS.Snail.JJJ.robot.modules
 
             foreach (var uid in club.Members)
             {
-                var member = FindMember(club.RobotWXID, uid);
+                var member = FindMember(uid);
                 if (member is null) continue;
                 int count = 0;
                 switch (type)
@@ -3655,10 +3762,15 @@ namespace RS.Snail.JJJ.robot.modules
         {
             var ret = new Dictionary<string, int>();
             if (club is null || !club.IsTodayUpdated()) return ret;
-
+            var sum = new Func<int, int>((int kit) => kit switch
+            {
+                1 or 3 => club.DrillUseLimit2,
+                2 => club.DrillUseLimit1,
+                _ => 0,
+            });
             foreach (var uid in club.Members)
             {
-                var member = FindMember(club.RobotWXID, uid);
+                var member = FindMember(uid);
                 if (member is null) continue;
                 int count = 0;
                 switch (type)
@@ -3666,9 +3778,13 @@ namespace RS.Snail.JJJ.robot.modules
                     case include.DrillQueryType.NOT_USE:
                         count = JSONHelper.ParseInt(member.Query("drill_total")) - JSONHelper.ParseInt(member.Query("drill"));
                         if (min > 0 && count < min) count = 0;
+                        if (club.RemindDrillLowerLimit > 0 && count < club.RemindDrillLowerLimit) count = 0;
                         break;
                     case include.DrillQueryType.LACK:
-                        count = JSONHelper.ParseInt(member.Query("drill_lack"));
+                        count = JSONHelper.ParseInt(member.Query("drill"));
+                        var drillStd = sum((int)member.Kit);
+                        if (drillStd == 0) count = 0;
+                        else count = Math.Max(0, drillStd - count);
                         break;
                     default:
                         break;
@@ -3691,7 +3807,7 @@ namespace RS.Snail.JJJ.robot.modules
 
             foreach (var uid in club.Members)
             {
-                var member = FindMember(club.RobotWXID, uid);
+                var member = FindMember(uid);
                 if (member is null) continue;
                 int count = JSONHelper.ParseInt(member.Query("event_multi_count"));
 
@@ -3712,7 +3828,7 @@ namespace RS.Snail.JJJ.robot.modules
 
             foreach (var uid in club.Members)
             {
-                var member = FindMember(club.RobotWXID, uid);
+                var member = FindMember(uid);
                 if (member is null) continue;
                 var dest = JSONHelper.ParseLong(member.Query("mine_dest"));
                 ret.Add(uid, dest);
@@ -3732,7 +3848,7 @@ namespace RS.Snail.JJJ.robot.modules
             if (string.IsNullOrEmpty(pos)) return list;
             foreach (var uid in club.Members)
             {
-                var member = FindMember(club.RobotWXID, uid);
+                var member = FindMember(uid);
                 if (member is null) continue;
                 var position = JSONHelper.ParseString(member.Query("mine_pos"));
                 if (position == pos) list.Add(uid);
@@ -3757,7 +3873,7 @@ namespace RS.Snail.JJJ.robot.modules
             foreach (var item in QueryGroupWarMineDestList(club))
             {
 
-                if (item.Value <= 0)
+                if (item.Value <= 1000000000)
                 {
                     if (!ret.ContainsKey(item.Key)) ret.Add(item.Key, new());
                     if (club.RemindContentNotCombine) ret[item.Key].Add($"{include.emoji.YIWEN}跳矿或离矿");
@@ -3771,12 +3887,14 @@ namespace RS.Snail.JJJ.robot.modules
                 }
                 else if (item.Value <= now + nearSec)
                 {
+                    if (club.DontRemindMineClose) continue;
                     if (!ret.ContainsKey(item.Key)) ret.Add(item.Key, new());
                     if (club.RemindContentNotCombine) ret[item.Key].Add($"{include.emoji.NAOZHONG}矿将在{TimeHelper.ChinsesTimeDurationDesc(item.Value - now)}后挖完");
                     else ret[item.Key].Add($"{include.emoji.NAOZHONG}挖矿即将超时");
                 }
                 else if (hour >= 21 && item.Value <= now + 6 * 3600)
                 {
+                    if (club.DontRemindMineClose) continue;
                     if (!ret.ContainsKey(item.Key)) ret.Add(item.Key, new());
                     if (club.RemindContentNotCombine) ret[item.Key].Add($"{include.emoji.NAOZHONG}矿将在{TimeHelper.ChinsesTimeDurationDesc(item.Value - now)}后挖完");
                     else ret[item.Key].Add($"{include.emoji.NAOZHONG}睡觉前换矿");
@@ -3825,7 +3943,7 @@ namespace RS.Snail.JJJ.robot.modules
         /// </summary>
         /// <param name="club"></param>
         /// <param name="type"></param>
-        /// <returns></returns>
+        /// <returns>{{uid,{desc1, ...}}}</returns>
         private Dictionary<string, List<string>> QueryGroupWarTokenSilverRemind(Club club, TokenQueryType type)
         {
             var ret = new Dictionary<string, List<string>>();
@@ -3935,10 +4053,10 @@ namespace RS.Snail.JJJ.robot.modules
 
             foreach (var uid in club.Members)
             {
-                var member = FindMember(club.RobotWXID, uid);
+                var member = FindMember(uid);
                 if (member is null) continue;
 
-                if (JSONHelper.ParseInt(member.Query("gw/today_count") < 1))
+                if (JSONHelper.ParseInt(member.Query("gw/today_count")) < 1)
                 {
                     if (!ret.ContainsKey(uid)) ret.Add(uid, new());
                     if (club.RemindContentNotCombine) ret[uid].Add($"{include.emoji.SPE1}蜣螂没打");
@@ -3964,7 +4082,7 @@ namespace RS.Snail.JJJ.robot.modules
 
             foreach (var uid in club.Members)
             {
-                var member = FindMember(club.RobotWXID, uid);
+                var member = FindMember(uid);
                 if (member is null) continue;
 
                 var _todayLack = JSONHelper.ParseInt(member.Query("gw/today_lack"));
@@ -3994,18 +4112,18 @@ namespace RS.Snail.JJJ.robot.modules
 
             foreach (var uid in club.Members)
             {
-                var member = FindMember(club.RobotWXID, uid);
+                var member = FindMember(uid);
                 if (member is null) continue;
 
                 var _notUseToday = JSONHelper.ParseInt(member.Query("gw/not_use_today"));
-                var _lackToday = JSONHelper.ParseInt(member.Query("gw/lack_today"));
+                var _lackToday = JSONHelper.ParseInt(club.Spe3DontNeedBuyGem ? member.Query("gw/lack_today_not_buy") : member.Query("gw/lack_today"));
                 var _isStarted = JSONHelper.ParseBool(member.Query("gw/is_started"));
 
                 if (_notUseToday > 0 && ((isAuto && hour >= 17) || !isAuto))
                 {
                     if (!ret.ContainsKey(uid)) ret.Add(uid, new());
                     if (club.RemindContentNotCombine) ret[uid].Add($"{include.emoji.SPE3}北极贝卷轴剩{_notUseToday}个");
-                    else ret[uid].Add($"{include.emoji.SPE3}蜣螂没打");
+                    else ret[uid].Add($"{include.emoji.SPE3}北极贝卷轴没用完");
                 }
 
                 if (_lackToday > 0 && ((isAuto && hour >= 17) || !isAuto))
@@ -4043,7 +4161,7 @@ namespace RS.Snail.JJJ.robot.modules
 
             foreach (var uid in club.Members)
             {
-                var member = FindMember(club.RobotWXID, uid);
+                var member = FindMember(uid);
                 if (member is null) continue;
 
                 var _dice = JSONHelper.ParseInt(member.Query("gw/dice"));
@@ -4091,7 +4209,7 @@ namespace RS.Snail.JJJ.robot.modules
 
             foreach (var uid in club.Members)
             {
-                var member = FindMember(club.RobotWXID, uid);
+                var member = FindMember(uid);
                 if (member is null) continue;
 
                 var _lack = JSONHelper.ParseInt(member.Query("gw/lack"));
@@ -4108,18 +4226,31 @@ namespace RS.Snail.JJJ.robot.modules
         /// <summary>
         /// 合并提醒查询数据
         /// </summary>
-        /// <param name="dic1"></param>
-        /// <param name="dic2"></param>
+        /// <param name="tarDic"></param>
+        /// <param name="srcDic"></param>
+        /// <param name="combineExcludedDesc">当字典中含有此词条时不再继续添加词条</param>
         /// <returns></returns>
-        private Dictionary<string, List<string>> CombineRemindDic(Dictionary<string, List<string>> dic1, Dictionary<string, List<string>> dic2)
+        private Dictionary<string, List<string>> CombineRemindDic(Dictionary<string, List<string>> tarDic,
+                                                                  Dictionary<string, List<string>> srcDic,
+                                                                  string combineExcludedDesc = "")
         {
-            var ret = dic1.DeepCopy();
-            foreach (var item in dic2)
+            var ret = tarDic.DeepCopy();
+            var silverTag = $"{include.emoji.SILVER}银牌没领";
+            var goldTag = $"{include.emoji.GOLD}金牌没领";
+            // {uid, {desc1, desc2, ...}}
+            foreach (var item in srcDic)
             {
                 if (!ret.ContainsKey(item.Key)) ret.Add(item.Key, new());
                 foreach (var _item in item.Value)
                 {
-                    if (!ret[item.Key].Contains(_item)) ret[item.Key].Add(_item);
+                    if (ret[item.Key].Contains(combineExcludedDesc)) continue;
+                    if ((ret[item.Key].Contains(silverTag) && _item == goldTag) || (ret[item.Key].Contains(goldTag) && _item == silverTag))
+                    {
+                        ret[item.Key].Add($"{include.emoji.GOLD}{include.emoji.SILVER}金银牌没领");
+                        ret[item.Key].Remove(silverTag);
+                        ret[item.Key].Remove(goldTag);
+                    }
+                    else if (!ret[item.Key].Contains(_item)) ret[item.Key].Add(_item);
                 }
             }
             return ret;
@@ -4140,13 +4271,15 @@ namespace RS.Snail.JJJ.robot.modules
                 if (club.RemindContentNotCombine)
                 {
                     // 不合并发出内容
-                    // var send = new List<(List<string> at, string content)>();
+                    // 发送失败列表（未绑定成员）
                     var notSend = new List<string>();
+                    // 发送内容列表
                     var sendContent = new Dictionary<string, string>();
+                    // 游戏UID与WXID字典
                     var uidWxid = new Dictionary<string, string>();
                     foreach (var item in data)
                     {
-                        uidWxid[item.Key] = QueryMemberWxid(club.RobotWXID, club.RID, item.Key) ?? "";
+                        uidWxid[item.Key] = QueryMemberWxid(club.RID, item.Key) ?? "";
                     }
 
                     foreach (var item in data)
@@ -4155,31 +4288,41 @@ namespace RS.Snail.JJJ.robot.modules
                         if (string.IsNullOrEmpty(wxid))
                         {
                             notSendCount++;
-                            notSend.Add($"[{QueryMemberName(club.RobotWXID, item.Key)}]{string.Join("，", item.Value)}");
+                            notSend.Add($"[{QueryMemberName(item.Key)}]{string.Join("，", item.Value)}");
                         }
                         else
                         {
                             sendCount++;
                             if (!sendContent.ContainsKey(wxid)) sendContent[wxid] = "";
-                            sendContent[wxid] += $"\n{include.emoji.ZHUYI}[{QueryMemberName(club.RobotWXID, item.Key)}]{string.Join("，", item.Value)} ({sendCount})";
+                            sendContent[wxid] += $"\n{include.emoji.ZHUYI}[{QueryMemberName(item.Key)}]{string.Join("，", item.Value)} ({sendCount})";
                         }
                     }
                     foreach (var item in sendContent)
                     {
-                        _context.WechatM.SendAtText(item.Value, new() { item.Key }, club.RobotWXID, chatroom, true);
+                        _context.WechatM.SendAtText(item.Value, new() { item.Key }, chatroom, true);
+                        //Console.WriteLine($"提醒：{item.Value}");
                     }
 
                     var notFound = new List<string>();
-                    notFound.Add($"共找到{data.Count}条");
-                    if (sendCount > 0) notFound.Add($"已发出{sendCount}条");
-                    if (notSendCount > 0) notFound.Add($"未发出{notSendCount}条");
-
-                    _context.WechatM.SendAtText($"{string.Join("，", notFound)}:\n{string.Join("\n", notSend)}",
-                                                    new List<string> { sender },
-                                                    club.RobotWXID,
-                                                    chatroom,
-                                                    true);
-                    // return (send, $"{string.Join("，", notFound)}:\n{string.Join("\n", notSend)}");
+                    notFound.Add($"共找到{data.Count}人");
+                    if (sendCount > 0) notFound.Add($"已提醒{sendCount}人");
+                    if (notSendCount > 0) notFound.Add($"未提醒{notSendCount}人");
+                    var notSendDesc = $"{string.Join("，", notFound)}:\n{string.Join("\n", notSend)}";
+                    if (notSendDesc.Length > 200)
+                    {
+                        var fileName = $"OUT\\未发送成功的清资源提醒_@{_context.ContactsM.QueryGroupMemberNickForFile(sender, chatroom)}_{DateTime.Now.ToString("yyyy_MM_dd_HH_mm_ss")}.txt";
+                        fileName = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, fileName);
+                        System.IO.File.WriteAllText(fileName, notSendDesc);
+                        _context.WechatM.SendFile(fileName, chatroom);
+                    }
+                    else
+                    {
+                        if (club.LoginDontAtHolder) _context.WechatM.SendText(notSendDesc, sender);
+                        else _context.WechatM.SendAtText(notSendDesc,
+                                                       new List<string> { sender },
+                                                       chatroom,
+                                                       true);
+                    }
                 }
                 else
                 {
@@ -4187,7 +4330,7 @@ namespace RS.Snail.JJJ.robot.modules
                     // 生成一个字典，Key为wxid，Value为绑定的UID列表
                     var wxidUIDs = new Dictionary<string, List<string>>();
                     var uidWxid = new Dictionary<string, string>();
-                    var group = _context.ContactsM.FindGroupByRID(club.RobotWXID, club.RID);
+                    var group = _context.ContactsM.FindGroupByRID(club.RID);
                     foreach (var item in group.Members)
                     {
                         wxidUIDs[item.Key] = item.Value.UIDs?.ToList() ?? new List<string>();
@@ -4207,75 +4350,103 @@ namespace RS.Snail.JJJ.robot.modules
                         if (string.IsNullOrEmpty(wxid))
                         {
                             notSendCount++;
-                            notSend.Add($"[{QueryMemberName(club.RobotWXID, item.Key)}]{string.Join("，", item.Value)}");
+                            notSend.Add($"[{QueryMemberName(item.Key)}]{string.Join("，", item.Value)}");
                         }
                         else
                         {
-                            sendCount++;
-                            var desc = string.Join("，", item.Value);
-                            if (!sendWxids.ContainsKey(desc)) sendWxids.Add(desc, new());
-                            if (!sendWxids[desc].ContainsKey(wxid)) sendWxids[desc].Add(wxid, new());
-                            sendWxids[desc][wxid].Add(item.Key);
+                            foreach (var desc in item.Value)
+                            {
+                                sendCount++;
+                                if (!sendWxids.ContainsKey(desc)) sendWxids.Add(desc, new());
+                                if (!sendWxids[desc].ContainsKey(wxid)) sendWxids[desc].Add(wxid, new());
+                                sendWxids[desc][wxid].Add(item.Key);
+                            }
                         }
                     }
 
                     foreach (var item in sendWxids)
                     {
-                        var content = new List<string>();
+                        var content = new List<List<string>> { new List<string>() };
+                        var subContent = "";
+                        var ats = new List<List<string>> { new List<string>() };
                         foreach (var member in item.Value)
                         {
                             var wxid = member.Key;
+                            if (!ats.Last().Contains(wxid)) ats.Last().Add(wxid);
                             var oriCount = wxidUIDs[wxid].Count;
                             var curCount = member.Value.Count;
-                            var wxNick = _context.ContactsM.QueryGroupMemberNick(wxid, club.RobotWXID, group.WXID);
-                            if (oriCount > 0)
+                            var wxNick = _context.ContactsM.QueryGroupMemberNick(wxid, group.WXID);
+                            if (oriCount > 1)
                             {
                                 if (oriCount == curCount)
+                                {
+
+                                    // 一个人的所有角色提示
+                                    subContent = $"@{wxNick}{chars.AtSpliter}(所有角色)";
+                                }
+                                else
                                 {
                                     var nicks = new List<string>();
                                     foreach (var uid in member.Value)
                                     {
                                         // 一个人的非所有角色提示
-                                        nicks.Add($"{QueryMemberName(club.RobotWXID, uid)}");
-                                        content.Add($"@{wxNick}{(char)0x85}({string.Join("，", nicks)})");
+                                        nicks.Add($"{QueryMemberName(uid)}");
                                     }
-                                }
-                                else
-                                {
-                                    // 一个人的所有角色提示
-                                    content.Add($"@{wxNick}{(char)0x85}(所有角色)");
+                                    subContent = $"@{wxNick}{chars.AtSpliter}({string.Join("，", nicks)})";
                                 }
                             }
                             else
                             {
                                 // 一个人仅有一个角色的提示
-                                content.Add($"@{wxNick}{(char)0x85}");
+                                subContent = $"@{wxNick}{chars.AtSpliter}";
                             }
+                            if ((string.Join("\n", content.Last()).Length + subContent.Length) > 200)
+                            {
+                                content.Add(new());
+                                ats.Add(new());
+                            }
+                            content.Last().Add(subContent);
                         }
 
-                        _context.WechatM.SendAtText($"{include.emoji.ZHUYI}{item.Key}：\n{string.Join("，", content)}",
-                                                 new List<string> { sender },
-                                                 club.RobotWXID,
-                                                 chatroom,
-                                                 true);
+                        for (int i = 0; i < content.Count; i++)
+                        {
+                            var indexDesc = content.Count > 1 ? $"({i + 1}/{content.Count})" : "";
+                            _context.WechatM.SendAtText($"{include.emoji.ZHUYI}{item.Key}{indexDesc}：\n{string.Join("，", content[i])}",
+                                                         ats[i],
+                                                         chatroom,
+                                                         false);
+                            //Console.WriteLine($"提醒：{include.emoji.ZHUYI}{item.Key}{indexDesc}：\n{string.Join("，", content[i])}");
+                        }
+
                     }
                     var notFound = new List<string>();
                     if (isAuto) notFound.Add($"[{club.Name}]登录完成，正在自动发出资源提醒");
-                    notFound.Add($"共找到{data.Count}条");
-                    if (sendCount > 0) notFound.Add($"已发出{sendCount}条");
-                    if (notSendCount > 0) notFound.Add($"未发出{notSendCount}条");
-                    _context.WechatM.SendAtText($"{string.Join("，", notFound)}:\n{string.Join("\n", notSend)}",
-                                                 new List<string> { sender },
-                                                 club.RobotWXID,
-                                                 chatroom,
-                                                 true);
+                    notFound.Add($"共找到{data.Count()}人");
+                    if (sendCount > 0) notFound.Add($"已提醒{data.Count() - notSendCount}人");
+                    if (notSendCount > 0) notFound.Add($"未提醒{notSendCount}人");
+                    var notSendDesc = $"{string.Join("，", notFound)}:\n{string.Join("\n", notSend)}";
+                    if (notSendDesc.Length > 200)
+                    {
+                        var fileName = $"OUT\\未发送成功的清资源提醒_@{_context.ContactsM.QueryGroupMemberNickForFile(sender, chatroom)}_{DateTime.Now.ToString("yyyy_MM_dd_HH_mm_ss")}.txt";
+                        fileName = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, fileName);
+                        System.IO.File.WriteAllText(fileName, notSendDesc);
+                        _context.WechatM.SendFile(fileName, chatroom);
+                    }
+                    else
+                    {
+                        if (club.LoginDontAtHolder) _context.WechatM.SendText($"{string.Join("，", notFound)}:\n{string.Join("\n", notSend)}", chatroom);
+                        else _context.WechatM.SendAtText($"{string.Join("，", notFound)}:\n{string.Join("\n", notSend)}",
+                                                     new List<string> { sender },
+                                                     chatroom,
+                                                     true);
+                    }
                 }
 
                 return true;
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, "ClubsM.SendRemindContent");
+                Context.Logger.WriteException(ex, "ClubsM.SendRemindContent");
                 return false;
             }
         }
@@ -4289,12 +4460,16 @@ namespace RS.Snail.JJJ.robot.modules
         /// 为一个俱乐部分配套装
         /// </summary>
         /// <param name="club"></param>
-        private void CalcKitPlan(Club club)
+        /// <param name="force">强制重新生成</param>
+        private void CalcKitPlan(Club club, bool force = false)
         {
             if (club is null) return;
-            var weekday = RS.Snail.JJJ.Client.core.game.module.TimeM.GetWeekDayStatic();
-            // 每周五可以直接重新分配，其他时间判断本周内是否排过，若未排过则可以排一次
-            if (weekday != 5 && club.IsWeekKitPlanned()) return;
+            if (!force)
+            {
+                var weekday = RS.Snail.JJJ.Client.core.game.module.TimeM.GetWeekDayStatic();
+                // 每周五可以直接重新分配，其他时间判断本周内是否排过，若未排过则可以排一次
+                if (weekday != 5 && club.IsWeekKitPlanned()) return;
+            }
 
             var members = club.Members;
             var memberData = new Dictionary<string, int>();
@@ -4303,7 +4478,7 @@ namespace RS.Snail.JJJ.robot.modules
 
             foreach (var uid in members)
             {
-                var user = FindMember(club.RobotWXID, uid);
+                var user = FindMember(uid);
                 memberInstances[uid] = user;
                 if (user is null) memberData[uid] = 0;
                 else
@@ -4311,14 +4486,25 @@ namespace RS.Snail.JJJ.robot.modules
                     var lockedKit = user.KitLocked;
                     if (lockedKit == Kit.UNDEFINED)
                     {
+                        var kitType = (club.ClubKitPlanType == ClubKitPlanType.UNDEFINED ? ClubKitPlanType.SONCOMBAT : club.ClubKitPlanType);
                         // 按兵种战力/实力/领导力进行排序和分配
-                        memberData[uid] = club.ClubKitPlanType switch
+                        if (kitType == ClubKitPlanType.FIVE)
                         {
-                            ClubKitPlanType.COMBAT => JSONHelper.ParseInt(user.Query("combat")),
-                            ClubKitPlanType.LEADERSHIP => JSONHelper.ParseInt(user.Query("leadership")),
-                            ClubKitPlanType.SONCOMBAT => JSONHelper.ParseInt(user.Query("son_combat")),
-                            _ => 0,
-                        };
+                            int five = 0;
+                            foreach (var attrib in include.club.FiveAttribs)
+                            {
+                                five += JSONHelper.ParseInt(user.Query(attrib));
+                            }
+                            memberData[uid] = five;
+                        }
+                        else memberData[uid] = JSONHelper.ParseInt(user.Query(include.club.ClubKitPlanTypeAttrib(kitType)));
+                        //club.ClubKitPlanType switch
+                        //{
+                        //    ClubKitPlanType.COMBAT => JSONHelper.ParseInt(user.Query("combat")),
+                        //    ClubKitPlanType.LEADERSHIP => JSONHelper.ParseInt(user.Query("leadership")),
+                        //    ClubKitPlanType.SONCOMBAT => JSONHelper.ParseInt(user.Query("son_combat")),
+                        //    _ => 0,
+                        //};
                     }
                     else
                     {
@@ -4333,11 +4519,12 @@ namespace RS.Snail.JJJ.robot.modules
                                 break;
                         }
                         user.KitAlloc = lockedKit;
+                        user.Set("kit_index", 25);
                     }
 
                 }
             }
-
+            members = members.Where(a => memberData.ContainsKey(a)).ToList();
             members.Sort((a, b) => memberData[b] - memberData[a]);
             int index = 100;
 
@@ -4360,8 +4547,10 @@ namespace RS.Snail.JJJ.robot.modules
                 }
                 if (memberInstances.ContainsKey(members[i]) && memberInstances[members[i]] is not null)
                 {
-                    memberInstances[members[i]].KitAlloc = kit;
-                    memberInstances[members[i]].Set("kit_index", index);
+                    string curUid = members[i];
+                    memberInstances[curUid].KitAlloc = kit;
+                    memberInstances[curUid].Set("kit_index", index);
+                    memberInstances[curUid].Set("kit_value", memberData[curUid]);
                     index--;
                 }
             }

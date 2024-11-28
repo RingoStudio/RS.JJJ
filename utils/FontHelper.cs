@@ -48,7 +48,7 @@ namespace RS.Snail.JJJ.utils
                 }
                 catch (Exception ex)
                 {
-                    Logger.Instance.Write(ex, "FontHelper.Init");
+                    Logger.Instance.WriteException(ex, "FontHelper.Init");
                 }
 
             }
@@ -90,7 +90,7 @@ namespace RS.Snail.JJJ.utils
             }
             catch (Exception ex)
             {
-                Logger.Instance.Write(ex, "FontHelper.GetFontItem");
+                Logger.Instance.WriteException(ex, "FontHelper.GetFontItem");
                 return new System.Drawing.Font(GetSystemDefaultFontName(), Convert.ToSingle(size));
             }
         }

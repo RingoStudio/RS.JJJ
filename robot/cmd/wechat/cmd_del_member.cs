@@ -27,19 +27,19 @@ namespace RS.Snail.JJJ.robot.cmd.wechat
         public UserRole MinRole => UserRole.GROUP_MANAGER;
         public WechatMessageType AcceptMessageType => WechatMessageType.Text;
 
-        async public Task Do(Message msg)
+        public void Do(Message msg)
         {
             try
             {
                 var arr = msg.ExplodeContent;
-                if (arr.Length < 3) return;
+                if (arr.Length < 2) return;
 
                 // uid
                 var uid = arr.Last();
                 if (!StringHelper.IsRID(uid)) return;
 
                 // 找到群
-                var group = _context.ContactsM.FindGroup(msg.Self, msg.Sender);
+                var group = _context.ContactsM.FindGroup(msg.RoomID);
                 if (group is not null && !string.IsNullOrEmpty(group.RID))
                 {
                     var purchase = _context.PurchaseM.CheckPurchase(group.RID, msg);
@@ -47,32 +47,23 @@ namespace RS.Snail.JJJ.robot.cmd.wechat
                     {
                         if (!string.IsNullOrEmpty(purchase.desc))
                         {
-                            _context.WechatM.SendAtText(purchase.desc,
-                                                  new List<string> { msg.WXID },
-                                                  msg.Self,
-                                                  msg.Sender);
+                            _context.WechatM.SendAtText(purchase.desc, new List<string> { msg.Sender }, msg.RoomID);
                         }
                         return;
                     }
                 }
                 if (group is null)
                 {
-                    _context.WechatM.SendAtText($"⚠️唧唧叽缺少当前微信群的资料，请联系超管使用命令\"刷新群信息\"。",
-                                                new List<string> { msg.WXID },
-                                                msg.Self,
-                                                msg.Sender);
+                    _context.WechatM.SendAtText($"⚠️唧唧叽缺少当前微信群的资料，请联系超管使用命令\"刷新群信息\"。", new List<string> { msg.Sender }, msg.RoomID);
                     return;
                 }
 
                 // 找到俱乐部
                 var rid = group.RID;
-                var club = _context.ClubsM.FindClub(msg.Self, uid);
+                var club = _context.ClubsM.FindClub(rid);
                 if (club is null)
                 {
-                    _context.WechatM.SendAtText($"⚠️要设置的俱乐部 [{uid}] 不存在。",
-                                                                          new List<string> { msg.WXID },
-                                                                          msg.Self,
-                                                                          msg.Sender);
+                    _context.WechatM.SendAtText($"⚠️要设置的俱乐部 [{rid}] 不存在。", new List<string> { msg.Sender }, msg.RoomID);
                     return;
                 }
 
@@ -80,13 +71,11 @@ namespace RS.Snail.JJJ.robot.cmd.wechat
                 if (club.Members is null || !club.Members.Contains(uid))
                 {
                     _context.WechatM.SendAtText($"⚠️要设置的俱乐部 [{club?.Name ?? "新俱乐部"}-{rid}] 中尚未存在UID为[{uid}]的成员。",
-                                                new List<string> { msg.WXID },
-                                                msg.Self,
-                                                msg.Sender);
+                                                new List<string> { msg.Sender }, msg.RoomID); ;
                     return;
                 }
 
-                var gameNick = _context.ClubsM.QueryMemberName(msg.Self, uid) ?? "蜗牛";
+                var gameNick = _context.ClubsM.QueryMemberName(uid) ?? "蜗牛";
                 gameNick += $"-{uid}";
 
                 // 已经绑定过此uid
@@ -101,28 +90,19 @@ namespace RS.Snail.JJJ.robot.cmd.wechat
                 }
                 if (string.IsNullOrEmpty(wxid))
                 {
-                    _context.WechatM.SendAtText($"本群内没有任何成员与游戏角色 [{gameNick}] 绑定。",
-                                               new List<string> { msg.WXID },
-                                               msg.Self,
-                                               msg.Sender);
+                    _context.WechatM.SendAtText($"本群内没有任何成员与游戏角色 [{gameNick}] 绑定。", new List<string> { msg.Sender }, msg.RoomID);
                     return;
                 }
 
-                var targetNick = _context.ContactsM.QueryGroupMemberNick(wxid, msg.Self, msg.Sender);
+                var targetNick = _context.ContactsM.QueryGroupMemberNick(wxid, msg.RoomID);
 
-                var result = _context.ContactsM.DelMember(msg.Self, group.WXID, uid);
-                if (result) _context.WechatM.SendAtText($"@{targetNick} 已被解除与游戏角色 [{gameNick}] 的绑定。\n",
-                                                       new List<string> { msg.WXID },
-                                                       msg.Self,
-                                                       msg.Sender);
-                else _context.WechatM.SendAtText("⚠️因未知原因，操作失败了。",
-                                                new List<string> { msg.WXID },
-                                                msg.Self,
-                                                msg.Sender);
+                var result = _context.ContactsM.DelMember(group.WXID, uid);
+                if (result) _context.WechatM.SendAtText($"@{targetNick} 已被解除与游戏角色 [{gameNick}] 的绑定。\n", new List<string> { msg.Sender }, msg.RoomID);
+                else _context.WechatM.SendAtText("⚠️因未知原因，操作失败了。", new List<string> { msg.Sender }, msg.RoomID);
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, Tag);
+                Context.Logger.WriteException(ex, Tag);
             }
         }
     }

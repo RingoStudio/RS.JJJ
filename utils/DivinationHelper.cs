@@ -476,7 +476,7 @@ namespace RS.Snail.JJJ.utils
             }
             catch (Exception ex)
             {
-                Logger.Instance.Write(ex, "ZHOUYI_DOWNLOAD");
+                Logger.Instance.WriteException(ex, "ZHOUYI_DOWNLOAD");
                 return null;
             }
         }

@@ -26,7 +26,7 @@ namespace RS.Snail.JJJ.robot.cmd.purchase
         public ChatScene EnableScene => ChatScene.All;
         public UserRole MinRole => UserRole.ADMINISTRATOR;
         public WechatMessageType AcceptMessageType => WechatMessageType.Text;
-        async public Task Do(Message msg)
+        public void Do(Message msg)
         {
             try
             {
@@ -37,7 +37,7 @@ namespace RS.Snail.JJJ.robot.cmd.purchase
                 var add = 0;
                 if (arr.Length > 1)
                 {
-                    for (int i = 1; i <= arr.Length; i++)
+                    for (int i = 1; i < arr.Length; i++)
                     {
                         if (StringHelper.IsRID(arr[i]) && string.IsNullOrEmpty(rid)) rid = arr[i];
                         else if (StringHelper.IsInt(arr[i])) add = Convert.ToInt32(arr[i]);
@@ -45,19 +45,16 @@ namespace RS.Snail.JJJ.robot.cmd.purchase
                         {
                             var num = arr[i].Substring(0, arr[i].Length - 1);
                             var mark = char.ToUpper(arr[i].Last());
-                            if (StringHelper.IsNumeric(num))
+                            if (StringHelper.IsNumeric(num) && "YMWDHI".Contains(mark))
                             {
-                                if ("YMWDHI".Contains(mark))
-                                {
-                                    type = mark;
-                                    add = Convert.ToInt32(num);
-                                }
+                                type = mark;
+                                add = Convert.ToInt32(num);
                             }
                         }
                     }
                 }
 
-                if (add == 0) return;
+                if (add == 0 ) return;
 
                 // 未指定rid，则为本群rid
                 if (string.IsNullOrEmpty(rid))
@@ -65,13 +62,11 @@ namespace RS.Snail.JJJ.robot.cmd.purchase
                     if (msg.Scene == ChatScene.Private) return;
                     else
                     {
-                        var group = _context.ContactsM.FindGroup(msg.Self, msg.Sender);
+                        var group = _context.ContactsM.FindGroup(msg.RoomID);
                         if (group is null)
                         {
                             _context.WechatM.SendAtText($"⚠️唧唧叽缺少当前微信群的资料，请联系超管使用命令\"刷新群信息\"。",
-                                                        new List<string> { msg.WXID },
-                                                        msg.Self,
-                                                        msg.Sender);
+                                                        new List<string> { msg.Sender }, msg.RoomID);
                             return;
                         }
                         rid = group.RID;
@@ -82,23 +77,22 @@ namespace RS.Snail.JJJ.robot.cmd.purchase
 
 
                 // 找到俱乐部
-                var club = _context.ClubsM.FindClub(msg.Self, rid);
+                var club = _context.ClubsM.FindClub(rid);
                 if (club is null)
                 {
                     _context.WechatM.SendAtText($"⚠️要查询的俱乐部[{rid}]不存在。",
-                                                new List<string> { msg.WXID },
-                                                msg.Self,
-                                                msg.Sender);
+                                                new List<string> { msg.Sender }, msg.RoomID);
                     return;
                 }
 
                 club.PurchaseEnd = type switch
                 {
                     'Y' => TimeHelper.AddYears(club.PurchaseEnd, add),
-                    'W' => TimeHelper.AddYears(club.PurchaseEnd, add),
+                    'M' => TimeHelper.AddMonths(club.PurchaseEnd, add),
+                    'W' => TimeHelper.AddWeeks(club.PurchaseEnd, add),
                     'D' => TimeHelper.AddDays(club.PurchaseEnd, add),
                     'I' => long.MinValue,
-                    _ => TimeHelper.AddMonths(club.PurchaseEnd, add),
+                    _ => club.PurchaseEnd,
                 };
 
                 string desc;
@@ -117,14 +111,11 @@ namespace RS.Snail.JJJ.robot.cmd.purchase
                     };
                     desc = $"已将俱乐部[{club.Name}]的唧唧叽订阅增加了{add}{type}，订阅期限延长至[{TimeHelper.ChinsesTimeDesc(club.PurchaseEnd)}]";
                 }
-                _context.WechatM.SendAtText(desc,
-                                               new List<string> { msg.WXID },
-                                               msg.Self,
-                                               msg.Sender);
+                _context.WechatM.SendAtText(desc, new List<string> { msg.Sender }, msg.RoomID);
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, Tag);
+                Context.Logger.WriteException(ex, Tag);
             }
         }
     }

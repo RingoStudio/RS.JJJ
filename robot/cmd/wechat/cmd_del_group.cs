@@ -31,11 +31,11 @@ namespace RS.Snail.JJJ.robot.cmd.wechat
 
         private static string _DoubleCheckTag = "cmd_del_group_double_check";
 
-        async public Task Do(Message msg)
+        public void Do(Message msg)
         {
             try
             {
-                _context.CommunicateM.UnregistWaitMessageRequest(msg.Self, msg.Sender, msg.WXID, _DoubleCheckTag);
+                _context.CommunicateM.UnregistWaitMessageRequest(msg.RoomID, msg.Sender, _DoubleCheckTag);
 
                 var arr = msg.ExplodeContent;
 
@@ -46,37 +46,30 @@ namespace RS.Snail.JJJ.robot.cmd.wechat
                 if (!StringHelper.IsRID(rid)) return;
 
                 // 找到俱乐部
-                var club = _context.ClubsM.FindClub(msg.Self, rid);
+                var club = _context.ClubsM.FindClub(rid);
 
                 if (club is null)
                 {
-                    _context.WechatM.SendAtText($"要设置的俱乐部[{rid}]不存在。",
-                                                new List<string> { msg.WXID },
-                                                msg.Self,
-                                                msg.Sender);
+                    _context.WechatM.SendAtText($"要设置的俱乐部[{rid}]不存在。", new List<string> { msg.Sender }, msg.RoomID);
                     return;
                 }
 
                 if (!CommonValidate.CheckPurchase(_context, msg, rid)) return;
 
-                var curHolder = _context.ContactsM.QueryClubHolder(msg.Self, rid);
-                if (string.IsNullOrEmpty(curHolder) || curHolder != msg.WXID)
+                var curHolder = _context.ContactsM.QueryClubHolderWXID(rid);
+                if (string.IsNullOrEmpty(curHolder) || curHolder != msg.Sender)
                 {
                     _context.WechatM.SendAtText($"你目前不是俱乐部[{club?.Name ?? "新俱乐部"}-{rid}]的会长。\n" +
-                                               $"此命令必须由当前俱乐部会长本人操作。",
-                                                new List<string> { msg.WXID },
-                                                msg.Self,
-                                                msg.Sender);
+                                                $"此命令必须由当前俱乐部会长本人操作。",
+                                                new List<string> { msg.Sender }, msg.RoomID);
                     return;
                 }
 
-                var group = _context.ContactsM.FindGroup(msg.Self, msg.Sender);
+                var group = _context.ContactsM.FindGroup(msg.RoomID);
                 if (group is null)
                 {
                     _context.WechatM.SendAtText($"唧唧叽缺少当前微信群的资料，请联系会长使用命令\"刷新群信息\"。",
-                                                new List<string> { msg.WXID },
-                                                msg.Self,
-                                                msg.Sender);
+                                                 new List<string> { msg.Sender }, msg.RoomID);
                     return;
                 }
 
@@ -86,21 +79,17 @@ namespace RS.Snail.JJJ.robot.cmd.wechat
                     if (curRID != rid)
                     {
                         // 当前群已经与其他俱乐部绑定
-                        var curClub = _context.ClubsM.FindClub(msg.Self, curRID);
+                        var curClub = _context.ClubsM.FindClub(curRID);
                         _context.WechatM.SendAtText($"当前微信群已经与其他俱乐部[{curClub?.Name ?? "新俱乐部"}-{curRID}]绑定。\n" +
                                                     $"此命令必须由该俱乐部会长本人操作。\n",
-                                                     new List<string> { msg.WXID },
-                                                     msg.Self,
-                                                     msg.Sender);
+                                                    new List<string> { msg.Sender }, msg.RoomID);
                         return;
                     }
                 }
                 else
                 {
                     _context.WechatM.SendAtText($"当前微信群尚未与任何俱乐部绑定。\n",
-                                                new List<string> { msg.WXID },
-                                                msg.Self,
-                                                msg.Sender);
+                                                new List<string> { msg.Sender }, msg.RoomID);
                     return;
                 }
 
@@ -109,36 +98,26 @@ namespace RS.Snail.JJJ.robot.cmd.wechat
                                             $"成员与游戏角色之间的绑定；\n" +
                                             $"所有经理的权限。\n" +
                                             $"若要继续操作，请在20秒内回复\"确定\"或\"取消\"！",
-                                            new List<string> { msg.WXID },
-                                            msg.Self,
-                                            msg.Sender);
-                _context.CommunicateM.RegistWaitMessageRequest(msg.Self, msg.Sender, msg.WXID,
-                                                               onReceivedCallback: new Func<Message, Task>((_msg) =>
+                                            new List<string> { msg.Sender }, msg.RoomID);
+                _context.CommunicateM.RegistWaitMessageRequest(msg.RoomID, msg.Sender,
+                                                               onReceivedCallback: new Action<Message>((_msg) =>
                                                                 {
-                                                                    return Task.Run(() =>
-                                                                     {
-                                                                         if (_msg.Content != "确定") return;
-                                                                         var result = false;
-                                                                         try
-                                                                         {
-                                                                             result = _context.ContactsM.UnbindGroup(_msg.Self, _msg.Sender);
-                                                                         }
-                                                                         catch (Exception ex)
-                                                                         {
-                                                                             Context.Logger.Write(ex, _DoubleCheckTag);
-                                                                         }
-                                                                         if (result) _context.WechatM.SendAtText($"俱乐部解绑完成。\n" +
-                                                                                                                 $"⚠️当前微信群已经成功与俱乐部俱乐部[{club?.Name ?? "新俱乐部"}-{rid}]解除绑定。\n" +
-                                                                                                                 $"⚠️当前微信群中的所有绑定信息和经理权限已被清空。\n" +
-                                                                                                                 $"俱乐部信息和会长权限被保留，你可以重新绑定群。",
-                                                                                                                 new List<string> { msg.WXID },
-                                                                                                                 msg.Self,
-                                                                                                                 msg.Sender);
-                                                                         else _context.WechatM.SendAtText("⚠️因未知原因，操作失败了。",
-                                                                                                         new List<string> { msg.WXID },
-                                                                                                         msg.Self,
-                                                                                                         msg.Sender);
-                                                                     });
+                                                                    if (_msg.Content != "确定") return;
+                                                                    var result = false;
+                                                                    try
+                                                                    {
+                                                                        result = _context.ContactsM.UnbindGroup(_msg.Sender);
+                                                                    }
+                                                                    catch (Exception ex)
+                                                                    {
+                                                                        Context.Logger.WriteException(ex, _DoubleCheckTag);
+                                                                    }
+                                                                    if (result) _context.WechatM.SendAtText($"俱乐部解绑完成。\n" +
+                                                                                                            $"⚠️当前微信群已经成功与俱乐部俱乐部[{club?.Name ?? "新俱乐部"}-{rid}]解除绑定。\n" +
+                                                                                                            $"⚠️当前微信群中的所有绑定信息和经理权限已被清空。\n" +
+                                                                                                            $"俱乐部信息和会长权限被保留，你可以重新绑定群。",
+                                                                                                            new List<string> { msg.Sender }, msg.RoomID);
+                                                                    else _context.WechatM.SendAtText("⚠️因未知原因，操作失败了。", new List<string> { msg.Sender }, msg.RoomID);
                                                                 }),
                                                             verifier: new Func<Message, bool>((_msg) =>
                                                             {
@@ -149,7 +128,7 @@ namespace RS.Snail.JJJ.robot.cmd.wechat
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, Tag);
+                Context.Logger.WriteException(ex, Tag);
             }
         }
     }

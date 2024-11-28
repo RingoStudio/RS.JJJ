@@ -30,7 +30,7 @@ namespace RS.Snail.JJJ.robot.cmd.conversation
         public UserRole MinRole => UserRole.GROUP_MANAGER;
         public WechatMessageType AcceptMessageType => WechatMessageType.Text;
 
-        async public Task Do(Message msg)
+        public void Do(Message msg)
         {
             try
             {
@@ -38,9 +38,9 @@ namespace RS.Snail.JJJ.robot.cmd.conversation
                 var rid = "";
                 var arr = msg.ExplodeContent;
                 var key = "";
-                if (arr.Length < 3) return;
+                if (arr.Length < 2) return;
 
-                for (int i = 1; i <= arr.Length; i++)
+                for (int i = 1; i < arr.Length; i++)
                 {
                     if (StringHelper.IsRID(arr[i]) && string.IsNullOrEmpty(rid)) rid = arr[i];
                     else if (string.IsNullOrEmpty(key)) key = arr[i];
@@ -53,13 +53,10 @@ namespace RS.Snail.JJJ.robot.cmd.conversation
                     if (msg.Scene == ChatScene.Private) return;
                     else
                     {
-                        var group = _context.ContactsM.FindGroup(msg.Self, msg.Sender);
+                        var group = _context.ContactsM.FindGroup(msg.RoomID);
                         if (group is null)
                         {
-                            _context.WechatM.SendAtText($"⚠️唧唧叽缺少当前微信群的资料，请联系超管使用命令\"刷新群信息\"。",
-                                                        new List<string> { msg.WXID },
-                                                        msg.Self,
-                                                        msg.Sender);
+                            _context.WechatM.SendAtText($"⚠️唧唧叽缺少当前微信群的资料，请联系超管使用命令\"刷新群信息\"。", new List<string> { msg.Sender }, msg.RoomID);
                             return;
                         }
                         rid = group.RID;
@@ -69,23 +66,17 @@ namespace RS.Snail.JJJ.robot.cmd.conversation
                 if (string.IsNullOrEmpty(rid)) return;
 
                 // 检查本俱乐部权限
-                if (!_context.ContactsM.CheckGroupRole(msg.Self, rid, msg.WXID, msg.Scene == ChatScene.Group ? msg.Sender : ""))
+                if (_context.ContactsM.QueryRole(msg.Sender, rid: rid) < MinRole)
                 {
-                    _context.WechatM.SendAtText($"不可以设置其他俱乐部的对话。",
-                                             new List<string> { msg.WXID },
-                                             msg.Self,
-                                             msg.Sender);
+                    _context.WechatM.SendAtText($"不可以设置其他俱乐部的对话。", new List<string> { msg.Sender }, msg.RoomID);
                     return;
                 }
 
                 // 找到俱乐部
-                var club = _context.ClubsM.FindClub(msg.Self, rid);
+                var club = _context.ClubsM.FindClub(rid);
                 if (club is null)
                 {
-                    _context.WechatM.SendAtText($"⚠️要查询的俱乐部[{rid}]不存在。",
-                                                new List<string> { msg.WXID },
-                                                msg.Self,
-                                                msg.Sender);
+                    _context.WechatM.SendAtText($"⚠️要查询的俱乐部[{rid}]不存在。", new List<string> { msg.Sender }, msg.RoomID);
                     return;
                 }
 
@@ -94,32 +85,23 @@ namespace RS.Snail.JJJ.robot.cmd.conversation
                 if (string.IsNullOrEmpty(key))
                 {
                     var tip = new List<string>();
-                    _context.WechatM.SendAtText($"在删除对话内容时，您输入了空的关键字，删除失败。",
-                                                 new List<string> { msg.WXID },
-                                                 msg.Self,
-                                                 msg.Sender);
+                    _context.WechatM.SendAtText($"在删除对话内容时，您输入了空的关键字，删除失败。", new List<string> { msg.Sender }, msg.RoomID);
                     return;
                 }
 
-                var result = _context.ConversationM.UpdateGroupConversation(rid, key, "");
+                var result = _context.ConversationM.DeleteGroupConversation(rid, key);
                 if (result)
                 {
-                    var desc = $"俱乐部[{_context.ClubsM.QueryClubName(msg.Self, rid) ?? rid}]已经删除了以下对话内容\n" +
+                    var desc = $"俱乐部[{_context.ClubsM.QueryClubName(rid) ?? rid}]已经删除了以下对话内容\n" +
                               $"关键字：{key}\n";
-                    _context.WechatM.SendAtText(desc,
-                                               new List<string> { msg.WXID },
-                                               msg.Self,
-                                               msg.Sender);
+                    _context.WechatM.SendAtText(desc, new List<string> { msg.Sender }, msg.RoomID);
                 }
-                else _context.WechatM.SendAtText("可能是因为关键字不存在，或其他原因，删除对话失败了。",
-                                                new List<string> { msg.WXID },
-                                                msg.Self,
-                                                msg.Sender);
+                else _context.WechatM.SendAtText("可能是因为关键字不存在，或其他原因，删除对话失败了。", new List<string> { msg.Sender }, msg.RoomID);
 
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, Tag);
+                Context.Logger.WriteException(ex, Tag);
             }
         }
     }

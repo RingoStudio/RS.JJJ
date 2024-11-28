@@ -29,7 +29,7 @@ namespace RS.Snail.JJJ.robot.cmd.wechat
         public UserRole MinRole => UserRole.GROUP_HOLDER;
         public WechatMessageType AcceptMessageType => WechatMessageType.Text;
 
-        async public Task Do(Message msg)
+        public void Do(Message msg)
         {
             try
             {
@@ -53,8 +53,9 @@ namespace RS.Snail.JJJ.robot.cmd.wechat
                 }
 
 
-                var role = _context.ContactsM.QueryRole(msg.Self, msg.WXID, msg.Sender);
-                if (role < include.UserRole.ADMINISTRATOR)
+                //var role = _context.ContactsM.QueryRole(msg.Sender, msg.RoomID);
+                var isAdmin = _context.ContactsM.IsAdmin(msg.Sender);
+                if (!isAdmin)
                 {
                     if (msg.Scene != include.ChatScene.Group)
                     {
@@ -66,56 +67,40 @@ namespace RS.Snail.JJJ.robot.cmd.wechat
                     }
                     isAll = false;
                 }
-
-                await Task.Run(() =>
+                if (!isAll)
                 {
-                    if (!isAll)
-                    {
-                        var group = _context.ContactsM.FindGroup(msg.Self, msg.Sender);
+                    var group = _context.ContactsM.FindGroup(msg.RoomID);
 
-                        if (group is null)
+                    if (group is null)
+                    {
+                        _context.WechatM.SendAtText($"⚠️唧唧叽缺少当前微信群的资料，请联系超管使用命令\"刷新群信息\"。", new List<string> { msg.Sender }, msg.RoomID);
+                        return;
+                    }
+                    var rid = group.RID;
+                    if (!StringHelper.IsRID(rid)) return;
+
+                    if (!isAdmin)
+                    {
+                        // 检查本俱乐部权限
+                        if (_context.ContactsM.QueryRole(msg.Sender, rid: rid) < MinRole)
                         {
-                            _context.WechatM.SendAtText($"⚠️唧唧叽缺少当前微信群的资料，请联系超管使用命令\"刷新群信息\"。",
-                                                        new List<string> { msg.WXID },
-                                                        msg.Self,
-                                                        msg.Sender);
+                            _context.WechatM.SendAtText($"不可以更新其他俱乐部微信群的信息。", new List<string> { msg.Sender }, msg.RoomID);
                             return;
                         }
-                        var rid = group.RID;
-                        if (!StringHelper.IsRID(rid)) return;
 
-                        if (role < UserRole.ADMINISTRATOR)
-                        {
-                            // 检查本俱乐部权限
-                            if (!_context.ContactsM.CheckGroupRole(msg.Self, rid, msg.WXID, msg.Scene == ChatScene.Group ? msg.Sender : ""))
-                            {
-                                _context.WechatM.SendAtText($"不可以更新其他俱乐部微信群的信息。",
-                                                         new List<string> { msg.WXID },
-                                                         msg.Self,
-                                                         msg.Sender);
-                                return;
-                            }
-
-                            if (!CommonValidate.CheckPurchase(_context, msg, rid)) return;
-                        }
+                        if (!CommonValidate.CheckPurchase(_context, msg, rid)) return;
                     }
+                }
 
-                    var result = _context.WechatM.RefreshGroupMemberNames(msg.Self, isAll ? "" : msg.Sender);
-                    var desc = isAll ? "通讯录" : (_context.ContactsM.FindGroup(msg.Self, msg.Sender)?.Name ?? "" + "群");
+                var result = _context.WechatM.RefreshGroupMemberNames(isAll ? "" : msg.RoomID);
+                var desc = isAll ? "所有群" : (_context.ContactsM.FindGroup(msg.RoomID)?.Name ?? "指定" + "群");
 
-                    if (result) _context.WechatM.SendAtText($"刷新{desc}信息成功。",
-                                                           new List<string> { msg.WXID },
-                                                           msg.Self,
-                                                           msg.Sender);
-                    else _context.WechatM.SendAtText("因未知原因，操作失败了。",
-                                                    new List<string> { msg.WXID },
-                                                    msg.Self,
-                                                    msg.Sender);
-                });
+                if (result) _context.WechatM.SendAtText($"刷新{desc}信息成功。", new List<string> { msg.Sender }, msg.RoomID);
+                else _context.WechatM.SendAtText("因未知原因，操作失败了。", new List<string> { msg.Sender }, msg.RoomID);
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, Tag);
+                Context.Logger.WriteException(ex, Tag);
             }
         }
     }

@@ -28,7 +28,7 @@ namespace RS.Snail.JJJ.robot.cmd.system
         public UserRole MinRole => UserRole.ADMINISTRATOR;
         public WechatMessageType AcceptMessageType => WechatMessageType.Text;
 
-        async public Task Do(Message msg)
+        public void Do(Message msg)
         {
             try
             {
@@ -42,50 +42,44 @@ namespace RS.Snail.JJJ.robot.cmd.system
                 {
                     case "全局响应":
                     case "communicate":
-                        desc = "禁用全局响应";
+                        desc = "全局响应";
                         _context.ConfigsM.SwitchCommunicateClose = !ConvertBool(flag);
                         break;
                     case "登录功能":
                     case "login":
-                        desc = "禁用登录功能";
+                        desc = "登录功能";
                         _context.ConfigsM.SwitchLoginClose = !ConvertBool(flag);
                         break;  
                     case "图鉴": // TODO
                     case "handbook":
-                        desc = "禁用图鉴功能";
+                        desc = "图鉴功能";
                         _context.ConfigsM.SwitchHandbookClose = !ConvertBool(flag);
                         break;
                     case "对话": // TODO
                     case "conversation":
-                        desc = "禁用对话功能";
+                        desc = "对话功能";
                         _context.ConfigsM.SwitchConversationClose = !ConvertBool(flag);
                         break;
                     case "抽签": // TODO
                     case "qian":
-                        desc = "禁用抽签功能";
+                        desc = "抽签功能";
                         _context.ConfigsM.SwitchQianClose = !ConvertBool(flag);
                         break;
                     case "密令": // TODO
                     case "cdkey":
-                        desc = "禁用密令功能";
+                        desc = "密令功能";
                         _context.ConfigsM.SwitchCDKeyClose = !ConvertBool(flag);
                         break;
                     default:
                         return;
                 }
 
-                _context.WechatM.SendAtText($"已将 [{desc}] 设置为 [{flag}]",
-                                               new List<string> { msg.WXID },
-                                               msg.Self,
-                                               msg.Sender);
+                _context.WechatM.SendAtText($"已将 [{desc}] 设置为 [{flag}]", new List<string> { msg.Sender }, msg.RoomID);
             }
             catch (Exception ex)
             {
-                Context.Logger.Write(ex, Tag);
-                _context.WechatM.SendAtText("⚠️因未知原因，操作失败了。",
-                                            new List<string> { msg.WXID },
-                                            msg.Self,
-                                            msg.Sender);
+                Context.Logger.WriteException(ex, Tag);
+                _context.WechatM.SendAtText("⚠️因未知原因，操作失败了。", new List<string> { msg.Sender }, msg.RoomID);
             }
         }
 
