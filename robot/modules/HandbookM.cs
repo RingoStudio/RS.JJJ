@@ -25,7 +25,7 @@ namespace RS.Snail.JJJ.robot.modules
         public bool Inited { get => _inited; }
         private Dictionary<string, CDKey> _cdKeys;
         private Dictionary<int, HandBookVisitors> _visitors;
-        private OSSHelper _oss = new();
+        private OSSHelper _oss;
         private object cdKeyLock = new object();
         #endregion
 
@@ -38,8 +38,18 @@ namespace RS.Snail.JJJ.robot.modules
         {
             if (_inited) return;
             _inited = true;
+            InitOSS();
             LoadCSV();
             RegistBackups();
+        }
+        private void InitOSS()
+        {
+            var iniPath = "BOT\\oss.ini";
+            var accessKeyID = RS.Tools.Common.Utils.IniHelper.Read(iniPath, "oss", "access_key_id", "");
+            var accessKeySecret = RS.Tools.Common.Utils.IniHelper.Read(iniPath, "oss", "access_key_secret", "");
+            var endPoint = RS.Tools.Common.Utils.IniHelper.Read(iniPath, "oss", "endpoint", "");
+            var bucketName = RS.Tools.Common.Utils.IniHelper.Read(iniPath, "oss", "bucket_name", "");
+            _oss = new(accessKeyID, accessKeySecret, endPoint, bucketName);
         }
         private void LoadCSV()
         {
@@ -78,7 +88,7 @@ namespace RS.Snail.JJJ.robot.modules
             #region cdkey
             try
             {
-                data = IOHelper.GetCSV(Tools.Common.Enums.CSVType.RobotData, include.files.CDKey) ?? new JArray();
+                data = IOHelper.GetCSV(Tools.Common.Enums.CSVType.UserData, include.files.CDKey) ?? new JArray();
                 _cdKeys = new();
                 foreach (var item in data)
                 {
@@ -111,7 +121,7 @@ namespace RS.Snail.JJJ.robot.modules
                     jo.date = item.Date;
                     data.Add(jo);
                 }
-                IOHelper.SaveCSV(Tools.Common.Enums.CSVType.RobotData, data, include.files.CDKey);
+                IOHelper.SaveCSV(Tools.Common.Enums.CSVType.UserData, data, include.files.CDKey);
             }
             catch (Exception ex)
             {
@@ -318,7 +328,7 @@ namespace RS.Snail.JJJ.robot.modules
         private void LoadVisitors()
         {
             _visitors = new Dictionary<int, HandBookVisitors>();
-            var visitorPath = $"BOT\\visitor.res";
+            var visitorPath = IOHelper.GetCSVPathByType(Tools.Common.Enums.CSVType.ResCSV, "visitor").path;
             if (System.IO.File.Exists(visitorPath))
             {
                 var visitorData = System.IO.File.ReadAllText(visitorPath) ?? "";
@@ -721,7 +731,7 @@ namespace RS.Snail.JJJ.robot.modules
                     approved = true;
                     if (quality == Client.core.game.include.CollectionSelectQuality.ALL) quality = _collectionQualityMap[key.ToUpper()];
                 }
-                else if (_collectionTypeMap.ContainsKey(key)) 
+                else if (_collectionTypeMap.ContainsKey(key))
                 {
                     approved = true;
                     if (type == Client.core.game.include.CollectionType.ALL) type = _collectionTypeMap[key];

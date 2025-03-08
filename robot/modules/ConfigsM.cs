@@ -157,6 +157,8 @@ namespace RS.Snail.JJJ.robot.modules
         /// OUT文件夹文件过期时间
         /// </summary>
         public long OUTFilesTimeout { get; private set; }
+
+        public bool CacheGroupData { get; private set; }
         #endregion
 
         #region INIT
@@ -214,6 +216,7 @@ namespace RS.Snail.JJJ.robot.modules
                 OUTFilesTimeout = JSONHelper.ParseLong(_commonConfigs.out_files_timeout);
                 if (OUTFilesTimeout <= 0) OUTFilesTimeout = 3 * 86400;
 
+                CacheGroupData = JSONHelper.ParseBool(_commonConfigs.cache_group_data);
                 //  _clubConfigs = IOHelper.GetCSV(Tools.Common.Enums.CSVType.RobotData, include.files.Club_Configs) ?? new JObject();
             }
             catch (Exception ex)

@@ -70,7 +70,7 @@ namespace RS.Snail.JJJ.robot.cmd.club
                 if (!CommonValidate.CheckPurchase(_context, msg, rid)) return;
 
                 var result =_context.ClubsM.QueryIncorrectKit(rid);
-                if (string.IsNullOrEmpty(result) || !System.IO.File.Exists(result)) _context.WechatM.SendAtText("⚠️未查询到任何信息。", new List<string> { msg.Sender }, msg.RoomID);
+                if (string.IsNullOrEmpty(result)) _context.WechatM.SendAtText("⚠️未查询到任何信息。", new List<string> { msg.Sender }, msg.RoomID);
                 else if (result.Length > 200)
                 {
                     var fileName = $"OUT\\领错套装查询结果_@{_context.ContactsM.QueryGroupMemberNickForFile(msg.Sender, msg.RoomID)}_{DateTime.Now.ToString("yyyy_MM_dd_HH_mm_ss")}.txt";
@@ -78,7 +78,7 @@ namespace RS.Snail.JJJ.robot.cmd.club
                     System.IO.File.WriteAllText(fileName, result);
                     _context.WechatM.SendFile(fileName, msg.RoomID);
                 }
-                else _context.WechatM.SendFile(result, msg.RoomID);
+                else _context.WechatM.SendAtText(result, new List<string> { msg.Sender }, msg.RoomID);
 
 
             }

@@ -18,17 +18,21 @@ namespace RS.Snail.JJJ.robot.cmd.broadcast
         public List<string> Content = new List<string>();
         public List<string> Files = new List<string>();
         public List<string> Images = new List<string>();
+        public List<ulong> Attachs = new List<ulong>();
         public int ContentLength
         {
             get
             {
                 if (Content.Count == 0) return 0;
                 int ret = 0;
-                Content.Select(a => ret += a.Length);
+                foreach (var str in Content)
+                {
+                    ret += str.Length;
+                }
                 return ret;
             }
         }
-        public int AttachCount { get => Files.Count + Images.Count; }
+        public int AttachCount { get => Files.Count + Images.Count + Attachs.Count; }
         public BroadCast(Message msg)
         {
             this.Sender = msg.Sender;

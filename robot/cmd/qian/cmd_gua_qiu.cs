@@ -39,7 +39,7 @@ namespace RS.Snail.JJJ.robot.cmd.qian
                 var arr = msg.ExplodeContent;
                 if (arr.Length < 2) return;
                 if (!StringHelper.IsInt(arr[1])) return;
-                number = Convert.ToInt32(arr[1]);
+                number = Convert.ToInt32(StringHelper.RemoveNotNumber(arr[1]));
 
                 // var role = _context.ContactsM.QueryRole(msg.Sender, msg.RoomID);
                 var isAdmin = _context.ContactsM.IsAdmin(msg.Sender);

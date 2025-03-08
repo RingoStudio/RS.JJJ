@@ -33,7 +33,7 @@ namespace RS.Snail.JJJ.robot.cmd.misc
             {
                 _context.WechatM.SendArtical(name: "唧唧叽用户手册",
                                              account: "gh_93e1f831311e", // 用飞碟的最强蜗牛头像
-                                             imagefilePath: System.IO.Path.GetFullPath("BOT\\jjj_instruction_cover.png"),
+                                             imagefilePath: System.IO.Path.GetFullPath("RES\\IMG\\jjj\\jjj_instruction_cover.png"),
                                              url: "https://docs.qq.com/doc/p/4d2394c38d6fe94ee050b44a5a5d65f89f7c4bc0",
                                              title: "唧唧叽用户手册",
                                              @abstract: "©RingoMango | 冰法集团 荣誉出品",

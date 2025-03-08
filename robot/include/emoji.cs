@@ -26,6 +26,9 @@ namespace RS.Snail.JJJ.robot.include
         public static string SPE5 = "🦗";
         public static string LOCATION = "📍";
         public static string OK = "👌";
+        public static string LEFT = "⬅️";
+        public static string RIGHT = "➡️";
+
 
     }
 }

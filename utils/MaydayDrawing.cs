@@ -20,7 +20,8 @@ namespace RS.Snail.JJJ.utils
                 var imageOutputPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "OUT", $"处方_{timeCode}.png");
 
                 // 3120*4620
-                var imagePath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "RES", "mayday", $"recipe_01.png");
+
+                var imagePath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "RES", "mayday", $"recipe_{city.Split("\\").Last()}.png");
                 var image = Bitmap.FromFile(imagePath);
                 var b = new System.Drawing.Bitmap(image.Width, image.Height, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
                 var g = Graphics.FromImage(b);
@@ -47,6 +48,7 @@ namespace RS.Snail.JJJ.utils
                 DrawStringHorizontal2(g, pos, title, Convert.ToSingle(fontSize), brush, fontStyle);
 
                 pos.Y = 1270;
+                city = city.Split("\\").First();
                 title = $"診斷: 五月天{city}戒斷綜合征";
                 DrawStringHorizontal2(g, pos, title, Convert.ToSingle(fontSize), brush, fontStyle);
 

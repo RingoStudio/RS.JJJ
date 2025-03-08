@@ -32,6 +32,7 @@ namespace RS.Snail.JJJ.utils
             JJJ.Client.core.game.include.CollectionRank rank = (JJJ.Client.core.game.include.CollectionRank)JSONHelper.ParseInt(data["rank"]);
             JJJ.Client.core.game.include.CollectionType type = (JJJ.Client.core.game.include.CollectionType)JSONHelper.ParseInt(data["type"]);
             int rarity = JSONHelper.ParseInt(data["rarity"]);
+            bool canSynchro = JSONHelper.ParseInt(data["can_synchro"]) > 0;
 
             Bitmap icon = GetResourcePNG("COLLECTION_HN_MAINBG_2");
             var b = new System.Drawing.Bitmap(icon.Width, icon.Height, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
@@ -203,6 +204,15 @@ HO_AFTER_RARITY:
                 propTitle = JSONHelper.ParseString(data["awake"]);
                 iconPos.Y += 19 * ratio;
                 DrawString(g, iconPos, propTitle, FontHelper.FontWeight.Medium, 12 * ratio, colorBrush, StringAlignment.LEFT);
+                if (canSynchro)
+                {
+                    propTitle = JSONHelper.ParseString(data["synchro_prop"]);
+                    if (!string.IsNullOrEmpty(propTitle))
+                    {
+                        iconPos.Y += 19 * ratio;
+                        DrawString(g, iconPos, propTitle, FontHelper.FontWeight.Medium, 12 * ratio, colorBrush, StringAlignment.LEFT);
+                    }
+                }
             }
             #endregion
 
@@ -217,7 +227,8 @@ HO_AFTER_RARITY:
             };
             if (!string.IsNullOrEmpty(enchase) && !string.IsNullOrEmpty(propTitle))
             {
-                iconPos.Y += 30 * ratio;
+                if (canSynchro) iconPos.Y += 25 * ratio;
+                else iconPos.Y += 30 * ratio;
                 DrawString(g, iconPos, propTitle, FontHelper.FontWeight.Black, 12 * ratio, commonBrush, StringAlignment.LEFT);
 
                 foreach (var line in enchase.Split("\n"))
@@ -231,7 +242,8 @@ HO_AFTER_RARITY:
             #region RETONATE
             if (data["resonate"] is not null && JSONHelper.GetCount(data["resonate"]) > 0)
             {
-                iconPos.Y += 30 * ratio;
+                if (canSynchro) iconPos.Y += 25 * ratio;
+                else iconPos.Y += 30 * ratio;
                 foreach (var item in data["resonate"])
                 {
                     var info = item.Value;

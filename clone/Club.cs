@@ -121,6 +121,10 @@ namespace RS.Snail.JJJ.clone
         /// </summary>
         public bool Spe3DontNeedBuyGem { get; set; }
         /// <summary>
+        /// 仓鼠周不需要参与拍卖
+        /// </summary>
+        public bool Spe4DontNeedAuction { get; set; }
+        /// <summary>
         /// 不需要提醒挖矿即将到期
         /// </summary>
         public bool DontRemindMineClose { get; set; }
@@ -189,7 +193,17 @@ namespace RS.Snail.JJJ.clone
         /// </summary>
         public dynamic CombatRecord { get; set; }
         public long KitPlanTime { get; set; }
-
+        public int Level { get; set; }
+        public int PropMembersNum { get; set; }
+        public int MaxMemberNum
+        {
+            get
+            {
+                int num = 60 + (Level / 5) * 5;
+                if (Level > 20) num += (Level - 20) / 5 * 5;
+                return num + PropMembersNum;
+            }
+        }
         #endregion
 
         #region PURCHASE
@@ -235,6 +249,7 @@ namespace RS.Snail.JJJ.clone
             LoginDontAtHolder = JSONHelper.ParseBool(data.login_dont_at_holder);
             LoginAuto = JSONHelper.ParseBool(data.login_auto);
             Spe3DontNeedBuyGem = JSONHelper.ParseBool(data.spe3_dont_need_buy_gem);
+            Spe4DontNeedAuction = JSONHelper.ParseBool(data.spe4_dont_need_auction);
             DontRemindMineClose = JSONHelper.ParseBool(data.dont_remind_mine_close);
             KitImageShowValue = JSONHelper.ParseBool(data.kit_image_show_value);
 
@@ -268,6 +283,8 @@ namespace RS.Snail.JJJ.clone
             PurchaseStart = JSONHelper.ParseLong(data.purchase_start);
             PurchaseEnd = JSONHelper.ParseLong(data.purchase_end);
             LoginSort = JSONHelper.ParseInt(data.login_sort);
+            Level = JSONHelper.ParseInt(data.level);
+            PropMembersNum = JSONHelper.ParseInt(data.prop_members_num);
 
             AutoLoginSheetApplied = JSONHelper.ParseBool(data.auto_login_sheet_applied);
             AutoLoginConfigs = new();
@@ -431,6 +448,7 @@ namespace RS.Snail.JJJ.clone
                 group_war_data = GroupWarData.dbase ?? new JObject(),
                 login_auto = LoginAuto,
                 spe3_dont_need_buy_gem = Spe3DontNeedBuyGem,
+                spe4_dont_need_auction = Spe4DontNeedAuction,
                 dont_remind_mine_close = DontRemindMineClose,
                 kit_image_show_value = KitImageShowValue,
 
@@ -462,6 +480,8 @@ namespace RS.Snail.JJJ.clone
                 purchase_start = PurchaseStart,
                 purchase_end = PurchaseEnd,
                 login_sort = LoginSort,
+                level = Level,
+                prop_members_num = PropMembersNum,
 
                 auto_login_sheet_applied = AutoLoginSheetApplied,
                 auto_login_configs = ((AutoLoginConfigs is null || AutoLoginConfigs.Count == 0) ? new JArray() : JArray.FromObject(AutoLoginConfigs.Select(x => x.GetJO()))),

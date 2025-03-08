@@ -19,6 +19,7 @@ namespace RS.Snail.JJJ.boot
 
         public bool IsRestart { get; private set; }
         public bool IsTest { get; private set; }
+        public bool IsDebug { get; private set; }
         #endregion
 
         #region INIT
@@ -101,10 +102,11 @@ namespace RS.Snail.JJJ.boot
             Console.Write(content);
         }
 
-        public Context(bool isRestart, bool isTest)
+        public Context(bool isRestart, bool isTest, bool isDebug)
         {
             IsRestart = isRestart;
             IsTest = isTest;
+            IsDebug = isDebug;
             InitModules();
             GC();
             RegistSchedule();
@@ -171,7 +173,7 @@ namespace RS.Snail.JJJ.boot
         }
         public void Started()
         {
-            WechatM.SendMgrNotice($"你好，我是唧唧叽，很高兴为你服务！", atAdmins: true);
+            if (!IsDebug) WechatM.SendMgrNotice($"你好，我是唧唧叽，很高兴为你服务！", atAdmins: true);
             WechatM.StartReceive();
         }
         /// <summary>

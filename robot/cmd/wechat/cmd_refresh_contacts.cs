@@ -92,7 +92,7 @@ namespace RS.Snail.JJJ.robot.cmd.wechat
                     }
                 }
 
-                var result = _context.WechatM.RefreshGroupMemberNames(isAll ? "" : msg.RoomID);
+                var result = _context.WechatM.RefreshGroupMemberNames(isAll ? "" : msg.RoomID, _context.ConfigsM.CacheGroupData);
                 var desc = isAll ? "所有群" : (_context.ContactsM.FindGroup(msg.RoomID)?.Name ?? "指定" + "群");
 
                 if (result) _context.WechatM.SendAtText($"刷新{desc}信息成功。", new List<string> { msg.Sender }, msg.RoomID);

@@ -33,7 +33,7 @@ namespace RS.Snail.JJJ.robot.cmd.purchase
                 // 新增订阅 [OPT:RID] [月数]
                 var rid = "";
                 var arr = msg.ExplodeContent;
-                char type = 'M';
+                char type = 'O';
                 var add = 0;
                 if (arr.Length > 1)
                 {
@@ -45,7 +45,7 @@ namespace RS.Snail.JJJ.robot.cmd.purchase
                         {
                             var num = arr[i].Substring(0, arr[i].Length - 1);
                             var mark = char.ToUpper(arr[i].Last());
-                            if (StringHelper.IsNumeric(num) && "YMWDHI".Contains(mark))
+                            if (StringHelper.IsNumeric(num) && "YMWDHIC".Contains(mark))
                             {
                                 type = mark;
                                 add = Convert.ToInt32(num);
@@ -54,7 +54,9 @@ namespace RS.Snail.JJJ.robot.cmd.purchase
                     }
                 }
 
-                if (add == 0 ) return;
+                if (!"YMWDHIC".Contains(type)) return;
+
+                // if (add == 0) return;
 
                 // 未指定rid，则为本群rid
                 if (string.IsNullOrEmpty(rid))
@@ -92,6 +94,7 @@ namespace RS.Snail.JJJ.robot.cmd.purchase
                     'W' => TimeHelper.AddWeeks(club.PurchaseEnd, add),
                     'D' => TimeHelper.AddDays(club.PurchaseEnd, add),
                     'I' => long.MinValue,
+                    'C' => TimeHelper.ToTimeStamp() - 3600,
                     _ => club.PurchaseEnd,
                 };
 
@@ -100,8 +103,13 @@ namespace RS.Snail.JJJ.robot.cmd.purchase
                 {
                     desc = $"已将俱乐部[{club.Name}]的唧唧叽订阅期限设置为[无限]";
                 }
+                if (type == 'C')
+                {
+                    desc = $"已将俱乐部[{club.Name}]的唧唧叽订阅期限清空";
+                }
                 else
                 {
+                    if (add == 0) return;
                     type = type switch
                     {
                         'Y' => '年',

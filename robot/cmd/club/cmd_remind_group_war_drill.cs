@@ -20,7 +20,7 @@ namespace RS.Snail.JJJ.robot.cmd.club
         {
             _context = context;
         }
-        public List<string> Commands => new List<string> { "提醒钻头", "提醒用钻头" };
+        public List<string> Commands => new List<string> { "提醒钻头", "提醒用钻头", "提醒清钻头" };
         public List<string> CommandsJP { get => Commands.Select(a => Pinyin.GetInitials(a).ToLower()).ToList(); }
         public List<string> CommandsQP { get => Commands.Select(a => Pinyin.GetPinyin(a).ToLower()).ToList(); }
         public string Tag => "cmd_remind_group_war_drill";

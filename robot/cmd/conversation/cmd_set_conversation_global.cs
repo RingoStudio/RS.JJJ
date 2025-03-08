@@ -155,7 +155,7 @@ namespace RS.Snail.JJJ.robot.cmd.conversation
                     }
                     else
                     {
-                        var path = _context.WechatM.GetFilePath(msg);
+                        var path = _context.WechatM.GetFilePath(msg) ?? "";
                         if (!System.IO.File.Exists(path))
                         {
                             _context.WechatM.SendAtText($"附件接收失败，请重新发送。\n" +
@@ -166,7 +166,8 @@ namespace RS.Snail.JJJ.robot.cmd.conversation
                                                         new List<string> { msg.Sender }, msg.RoomID);
                             Loops(msg);
                         }
-                        else if (bc.Files.Contains(path))
+                        path = JJJ.utils.Utils.SaveReceivedFile(path);
+                        if (bc.Files.Contains(path))
                         {
                             _context.WechatM.SendAtText($"你发送了重复的附件，请重新发送。\n" +
                                                         "请发送\"确定\"完成并保存对话。\n" +
@@ -192,7 +193,7 @@ namespace RS.Snail.JJJ.robot.cmd.conversation
                 }
                 else if (msg.Type == Tools.Common.Enums.WechatMessageType.Image)
                 {
-                    var path = _context.WechatM.GetImagePath(msg);
+                    var path = _context.WechatM.GetImagePath(msg) ?? "";
                     if (!System.IO.File.Exists(path))
                     {
                         _context.WechatM.SendAtText($"图片接收失败，请重新发送。\n" +
@@ -203,7 +204,8 @@ namespace RS.Snail.JJJ.robot.cmd.conversation
                                                     new List<string> { msg.Sender }, msg.RoomID);
                         Loops(msg);
                     }
-                    else if (bc.Images.Contains(path))
+                    path = JJJ.utils.Utils.SaveReceivedFile(path);
+                    if (bc.Images.Contains(path))
                     {
                         _context.WechatM.SendAtText($"你发送了重复的图片，请重新发送。\n" +
                                                     "请发送\"确定\"完成并保存对话。\n" +

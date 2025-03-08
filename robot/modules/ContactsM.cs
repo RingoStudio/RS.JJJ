@@ -55,9 +55,9 @@ namespace RS.Snail.JJJ.robot.modules
         private void RegistBackups()
         {
             _context.BackupM.RegistSaveSessions(ModuleName, SaveCSV);
-            _context.BackupM.RegistBackupSession(Tools.Common.Enums.CSVType.RobotData, include.files.User_List_CSV);
-            _context.BackupM.RegistBackupSession(Tools.Common.Enums.CSVType.RobotData, include.files.Group_List_CSV);
-            _context.BackupM.RegistBackupSession(Tools.Common.Enums.CSVType.RobotData, include.files.Role_Cache);
+            _context.BackupM.RegistBackupSession(Tools.Common.Enums.CSVType.UserClub, include.files.User_List_CSV);
+            _context.BackupM.RegistBackupSession(Tools.Common.Enums.CSVType.UserClub, include.files.Group_List_CSV);
+            _context.BackupM.RegistBackupSession(Tools.Common.Enums.CSVType.UserClub, include.files.Role_Cache);
         }
 
         private void LoadCSV()
@@ -66,7 +66,7 @@ namespace RS.Snail.JJJ.robot.modules
             #region USERS
             try
             {
-                data = IOHelper.GetCSV(Tools.Common.Enums.CSVType.RobotData, include.files.User_List_CSV);
+                data = IOHelper.GetCSV(Tools.Common.Enums.CSVType.UserClub, include.files.User_List_CSV);
                 _users = new();
                 if (data is JObject && JSONHelper.GetCount(data) > 0)
                 {
@@ -85,7 +85,7 @@ namespace RS.Snail.JJJ.robot.modules
             #region GROUPS
             try
             {
-                data = IOHelper.GetCSV(Tools.Common.Enums.CSVType.RobotData, include.files.Group_List_CSV);
+                data = IOHelper.GetCSV(Tools.Common.Enums.CSVType.UserClub, include.files.Group_List_CSV);
                 _groups = new();
                 if (data is JObject && JSONHelper.GetCount(data) > 0)
                 {
@@ -130,7 +130,7 @@ namespace RS.Snail.JJJ.robot.modules
                 {
                     jo[item.Key] = item.Value.GetJO();
                 }
-                IOHelper.SaveCSV(RS.Tools.Common.Enums.CSVType.RobotData, jo, include.files.User_List_CSV);
+                IOHelper.SaveCSV(RS.Tools.Common.Enums.CSVType.UserClub, jo, include.files.User_List_CSV);
             }
             catch (Exception ex)
             {
@@ -144,7 +144,7 @@ namespace RS.Snail.JJJ.robot.modules
                 {
                     jo[item.Key] = item.Value.GetJO();
                 }
-                IOHelper.SaveCSV(RS.Tools.Common.Enums.CSVType.RobotData, jo, include.files.Group_List_CSV);
+                IOHelper.SaveCSV(RS.Tools.Common.Enums.CSVType.UserClub, jo, include.files.Group_List_CSV);
             }
             catch (Exception ex)
             {
@@ -153,7 +153,7 @@ namespace RS.Snail.JJJ.robot.modules
             try
             {
                 jo = JObject.FromObject(_roleCache);
-                IOHelper.SaveCSV(RS.Tools.Common.Enums.CSVType.RobotData, jo, include.files.Role_Cache);
+                IOHelper.SaveCSV(RS.Tools.Common.Enums.CSVType.UserClub, jo, include.files.Role_Cache);
             }
             catch (Exception ex)
             {
@@ -598,11 +598,13 @@ namespace RS.Snail.JJJ.robot.modules
         /// </summary>
         /// <param name="data"></param>
         /// <returns></returns>
-        public bool RefreshGroupMemberNicks(Dictionary<string, Dictionary<string, string>> data)
+        public bool RefreshGroupMemberNicks(Dictionary<string, Dictionary<string, string>> data, bool cacheData = false)
         {
+            var cache = new List<string>();
             foreach (var groupData in data)
             {
                 if (!_groups.ContainsKey(groupData.Key)) _groups.TryAdd(groupData.Key, new Group(groupData.Key, ""));
+                if (cacheData) cache.Add($"群ID: {groupData.Key}, 群名称: {_groups[groupData.Key].Name}");
                 _groups[groupData.Key].IsIn = true;
 
                 foreach (var memberData in groupData.Value)
@@ -611,10 +613,13 @@ namespace RS.Snail.JJJ.robot.modules
                     {
                         _groups[groupData.Key].Members[memberData.Key].NickName = memberData.Value;
                         _groups[groupData.Key].Members[memberData.Key].IsInGroup = true;
+                        if (cacheData) cache.Add($"> 成员ID: {memberData.Key}, 昵称: {memberData.Value}");
+
                     }
                     else
                     {
                         _groups[groupData.Key].Members.TryAdd(memberData.Key, new GroupMember(memberData.Key, memberData.Value));
+                        if (cacheData) cache.Add($"> (新)成员ID: {memberData.Key}, 昵称: {memberData.Value}");
                     }
 
                     // 加入user列表
@@ -654,6 +659,11 @@ namespace RS.Snail.JJJ.robot.modules
                         }
                     }
                 }
+            }
+
+            if (cacheData)
+            {
+                Context.Logger.WriteInfo("GroupData", string.Join("\n", cache));
             }
             return true;
         }

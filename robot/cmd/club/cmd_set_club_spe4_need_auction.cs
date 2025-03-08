@@ -13,17 +13,17 @@ using System.Threading.Tasks;
 namespace RS.Snail.JJJ.robot.cmd.club
 {
 
-    internal class cmd_set_club_remind_drill_lower_limit : ICMD
+    internal class cmd_set_club_spe4_need_auction : ICMD
     {
         public Context _context { get; set; }
-        public cmd_set_club_remind_drill_lower_limit(Context context)
+        public cmd_set_club_spe4_need_auction(Context context)
         {
             _context = context;
         }
-        public List<string> Commands => new List<string> { "设置提醒钻头下限", "设置提醒钻头使用下限", "设置提醒钻头使用数量下限", "设置提醒钻头剩余数量下限" };
+        public List<string> Commands => new List<string> { "设置仓鼠需要拍卖", "设置仓鼠需要参加拍卖", "设置仓鼠需要参与拍卖" };
         public List<string> CommandsJP { get => Commands.Select(a => Pinyin.GetInitials(a).ToLower()).ToList(); }
         public List<string> CommandsQP { get => Commands.Select(a => Pinyin.GetPinyin(a).ToLower()).ToList(); }
-        public string Tag => "cmd_set_club_remind_drill_lower_limit";
+        public string Tag => "cmd_set_club_spe4_need_auction";
         public ChatScene EnableScene => ChatScene.All;
         public UserRole MinRole => UserRole.GROUP_MANAGER;
         public WechatMessageType AcceptMessageType => WechatMessageType.Text;
@@ -31,20 +31,21 @@ namespace RS.Snail.JJJ.robot.cmd.club
         {
             try
             {
-                // 设置登录后提醒挖矿 [OPT:RID] [自动/手动]
+                // 设置仓鼠需要拍卖 [OPT:RID] [是/否]
                 var rid = "";
                 var arr = msg.ExplodeContent;
-                int val = 0;
+                var mode = 0;
                 if (arr.Length > 1)
                 {
                     for (int i = 1; i < arr.Length; i++)
                     {
                         if (StringHelper.IsRID(arr[i])) rid = arr[i];
-                        if (StringHelper.IsInt(arr[i])) val = Convert.ToInt32((string)arr[i]);
+                        if (arr[i] == "开" || arr[i] == "开启" || arr[i].ToLower() == "on" || arr[i].ToLower() == "是" || arr[i].ToLower() == "需要") mode = 1;
+                        else if (arr[i] == "关" || arr[i] == "关闭" || arr[i].ToLower() == "off" || arr[i].ToLower() == "否" || arr[i].ToLower() == "不需要") mode = -1;
                     }
                 }
-                val = Math.Max(0, val);
-                //if (val == 0) return;
+
+                if (mode == 0) return;
 
                 // 未指定rid，则为本群rid
                 if (string.IsNullOrEmpty(rid))
@@ -81,10 +82,10 @@ namespace RS.Snail.JJJ.robot.cmd.club
 
                 if (!CommonValidate.CheckPurchase(_context, msg, rid)) return;
 
-                club.RemindDrillLowerLimit = val;
-                var desc = $"已将俱乐部[{club.Name}]的提醒钻头剩余数量下限设置为";
-                desc += (val == 0) ? "[0]\n之后的周四清资源提醒以及手动用钻头提醒中，将提醒所有剩余钻头大于等于1的成员。" :
-                                    $"[{val}]\n之后的周四清资源提醒以及手动用钻头提醒中，将只会提醒剩余钻头大于等于{val}个的成员";
+                club.Spe4DontNeedAuction = (mode < 0);
+                var desc = $"已将俱乐部[{club.Name}]的仓鼠需要拍卖设置为";
+                desc += (!club.Spe4DontNeedAuction) ? "[需要]\n该俱乐部参与拍卖的成员将会被提醒" :
+                                                     "[不需要]\n该俱乐部未参与拍卖的成员将不会被提醒";
                 _context.WechatM.SendAtText(desc, new List<string> { msg.Sender }, msg.RoomID);
             }
             catch (Exception ex)

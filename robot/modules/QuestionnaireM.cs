@@ -54,7 +54,7 @@ namespace RS.Snail.JJJ.robot.modules
             _questionnaires = new JObject();
             try
             {
-                _questionnaires = IOHelper.GetCSV(Tools.Common.Enums.CSVType.RobotData, include.files.Questionnaire_CSV) ?? new JObject();
+                _questionnaires = IOHelper.GetCSV(Tools.Common.Enums.CSVType.UserData, include.files.Questionnaire_CSV) ?? new JObject();
             }
             catch (Exception ex)
             {
@@ -66,7 +66,7 @@ namespace RS.Snail.JJJ.robot.modules
         {
             try
             {
-                IOHelper.SaveCSV(Tools.Common.Enums.CSVType.RobotData, _questionnaires, include.files.Questionnaire_CSV);
+                IOHelper.SaveCSV(Tools.Common.Enums.CSVType.UserData, _questionnaires, include.files.Questionnaire_CSV);
             }
             catch (Exception ex)
             {
@@ -78,7 +78,7 @@ namespace RS.Snail.JJJ.robot.modules
         private void RegistBackups()
         {
             _context.BackupM.RegistSaveSessions(ModuleName, SaveCSV);
-            _context.BackupM.RegistBackupSession(Tools.Common.Enums.CSVType.RobotData, include.files.Questionnaire_CSV);
+            _context.BackupM.RegistBackupSession(Tools.Common.Enums.CSVType.UserData, include.files.Questionnaire_CSV);
         }
         #endregion
 

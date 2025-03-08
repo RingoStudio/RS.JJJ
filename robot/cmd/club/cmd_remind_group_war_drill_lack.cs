@@ -7,42 +7,52 @@ using RS.Tools.Common.Utils;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 
 namespace RS.Snail.JJJ.robot.cmd.club
 {
 
-    internal class get_auto_login_config_excel : ICMD
+    internal class cmd_remind_group_war_drill_lack : ICMD
     {
         public Context _context { get; set; }
-        public get_auto_login_config_excel(Context context)
+        public cmd_remind_group_war_drill_lack(Context context)
         {
             _context = context;
         }
-        public List<string> Commands => new List<string> { "自动登录设置表", "获取自动登录设置表", "自动登录配置表", "获取自动登录配置表" };
+        public List<string> Commands => new List<string> { "提醒钻头达标", "提醒钻头未达标" };
         public List<string> CommandsJP { get => Commands.Select(a => Pinyin.GetInitials(a).ToLower()).ToList(); }
         public List<string> CommandsQP { get => Commands.Select(a => Pinyin.GetPinyin(a).ToLower()).ToList(); }
-        public string Tag => "get_auto_login_config_excel";
+        public string Tag => "cmd_remind_group_war_drill_lack";
         public ChatScene EnableScene => ChatScene.Group;
         public UserRole MinRole => UserRole.GROUP_MANAGER;
         public WechatMessageType AcceptMessageType => WechatMessageType.Text;
+
         public void Do(Message msg)
         {
             try
             {
-                // 找到群
+                // 提醒钻头 [OPT:MIN] [OPT:INSTRU]
+                var arr = msg.ExplodeContent;
+
                 var group = _context.ContactsM.FindGroup(msg.RoomID);
                 if (group is null)
                 {
-                    _context.WechatM.SendAtText($"⚠️唧唧叽缺少当前微信群的资料，请联系超管使用命令\"刷新群信息\"。",
-                                                new List<string> { msg.Sender }, msg.RoomID);
+                    _context.WechatM.SendAtText($"⚠️唧唧叽缺少当前微信群的资料，请联系超管使用命令\"刷新群信息\"。", new List<string> { msg.Sender }, msg.RoomID);
+                    return;
+                }
+                var rid = group.RID;
+
+                if (string.IsNullOrEmpty(rid)) return;
+
+                // 检查本俱乐部权限
+                if (_context.ContactsM.QueryRole(msg.Sender, rid: rid) < MinRole)
+                {
+                    _context.WechatM.SendAtText($"您没有查看该俱乐部相关信息的权限。", new List<string> { msg.Sender }, msg.RoomID);
                     return;
                 }
 
                 // 找到俱乐部
-                var rid = group.RID;
                 var club = _context.ClubsM.FindClub(rid);
                 if (club is null)
                 {
@@ -50,12 +60,14 @@ namespace RS.Snail.JJJ.robot.cmd.club
                     return;
                 }
 
-
                 if (!CommonValidate.CheckPurchase(_context, msg, rid)) return;
 
-                var path = "RES\\TEMPLATES\\自动登录配置表.xlsx";
-                if (System.IO.File.Exists(path)) _context.WechatM.SendFile(path, msg.IsGroup ? msg.RoomID : msg.Sender);
-                else _context.WechatM.SendAtText("⚠️因未知原因，操作失败了。", new List<string> { msg.Sender }, msg.RoomID);
+                var result = _context.ClubsM.RemindGroupWarDrillLack(rid, msg.RoomID, msg.Sender);
+                if (!result.result)
+                {
+                    if (string.IsNullOrEmpty(result.desc)) _context.WechatM.SendAtText("⚠️未查询到任何信息。", new List<string> { msg.Sender }, msg.RoomID);
+                    else _context.WechatM.SendAtText($"⚠️{result.desc ?? "提醒失败了"}", new List<string> { msg.Sender }, msg.RoomID);
+                }
             }
             catch (Exception ex)
             {

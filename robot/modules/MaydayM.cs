@@ -145,7 +145,7 @@ namespace RS.Snail.JJJ.robot.modules
             #region 记录及配置
             try
             {
-                var data = IOHelper.GetCSV(Tools.Common.Enums.CSVType.Mayday);
+                var data = IOHelper.GetCSV(Tools.Common.Enums.CSVType.MaydayCache);
                 data = data ?? new JObject();
                 _maydayGroups = JSONHelper.ParseStringList(data.groups) ?? new List<string>();
                 _bannedWxids = JSONHelper.ParseStringList(data.bans) ?? new List<string>();
@@ -188,7 +188,7 @@ namespace RS.Snail.JJJ.robot.modules
                     recipe_index = _recipeIndex,
                     cds = dic,
                 });
-                IOHelper.SaveCSV(Tools.Common.Enums.CSVType.Mayday, save);
+                IOHelper.SaveCSV(Tools.Common.Enums.CSVType.MaydayCache, save);
             }
             catch (Exception ex)
             {

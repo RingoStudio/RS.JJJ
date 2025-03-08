@@ -37,7 +37,11 @@ namespace RS.Snail.JJJ.robot.cmd.wechat
 
                 // 解析rid
                 var rid = arr.Last();
-                if (!StringHelper.IsRID(rid)) return;
+                if (!StringHelper.IsRID(rid))
+                {
+                    _context.WechatM.SendAtText($"⚠️[{rid}]不是正确的俱乐部RID。", new List<string> { msg.Sender }, msg.RoomID);
+                    return;
+                }
 
                 var club = _context.ClubsM.FindClub(rid);
 
@@ -63,7 +67,7 @@ namespace RS.Snail.JJJ.robot.cmd.wechat
                         var wxids = _context.ContactsM.QueryGroupMemberWXID(arr[1], msg.RoomID);
 
                         // 没有找到成员
-                        if (wxids is null)
+                        if (wxids is null || wxids.Count == 0)
                         {
                             _context.WechatM.SendAtText($"⚠️在设置会长时没有找到昵称为[{arr[1]}]的群成员。", new List<string> { msg.Sender }, msg.RoomID);
                             return;

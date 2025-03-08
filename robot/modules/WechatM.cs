@@ -156,7 +156,6 @@ namespace RS.Snail.JJJ.robot.modules
         /// </summary>
         /// <param name="content"></param>
         /// <param name="atAdmins"></param>
-
         public void SendMgrNotice(string content, bool atAdmins = false)
         {
             var chatroom = _wechatCFG.ManagerGroup;
@@ -218,6 +217,17 @@ namespace RS.Snail.JJJ.robot.modules
 
             _wechat.SendPat(chatroom, wxid);
         }
+        /// <summary>
+        /// 转发消息
+        /// </summary>
+        /// <param name="msgID"></param>
+        /// <param name="target"></param>
+        public void ForwardMsg(ulong msgID, string target)
+        {
+            Context.Logger.WriteInfo("WechatM", $"[TO:{_context.ContactsM.QueryContactNick(target)}] Forward:{msgID}");
+            if (_context.IsTest) return;
+            _wechat.ForwardMsg(msgID, target);
+        }
         #endregion
 
         #region MESSAGES RECEIVE
@@ -273,7 +283,7 @@ namespace RS.Snail.JJJ.robot.modules
         /// </summary>
         /// <param name="chatroom"></param>
         /// <returns></returns>
-        public bool RefreshGroupMemberNames(string chatroom = "")
+        public bool RefreshGroupMemberNames(string chatroom = "", bool cacheData = false)
         {
             var flag = true;
             try
@@ -291,7 +301,7 @@ namespace RS.Snail.JJJ.robot.modules
 
                 // 群成员昵称
                 var groupData = _wechat.GetChatroomMemberNames(chatroom);
-                flag &= _context.ContactsM.RefreshGroupMemberNicks(groupData);
+                flag &= _context.ContactsM.RefreshGroupMemberNicks(groupData, cacheData);
 
                 return flag;
             }

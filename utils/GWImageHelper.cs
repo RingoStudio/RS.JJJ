@@ -31,7 +31,7 @@ namespace RS.Snail.JJJ.utils
         private static Bitmap LoadImage(string name)
         {
             if (string.IsNullOrEmpty(name)) return null;
-            var path = AppDomain.CurrentDomain.BaseDirectory + @$"BOT\{name}.png";
+            var path = AppDomain.CurrentDomain.BaseDirectory + @$"RES\IMG\jjj\{name}.png";
             lock (_locker)
             {
                 if (!File.Exists(path)) return null;

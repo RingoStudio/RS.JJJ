@@ -22,7 +22,7 @@ namespace RS.Snail.JJJ.utils
         {
             if (_inited) return;
             _inited = true;
-            _guaData = IOHelper.GetCSV(Tools.Common.Enums.CSVType.RobotData, "zhouyi64") ?? new JObject();
+            _guaData = IOHelper.GetCSV(Tools.Common.Enums.CSVType.ResCSV, "zhouyi64") ?? new JObject();
         }
 
         // 乾一兑二离三震四巽(xun4)五坎六艮(geng4)七坤八
@@ -357,7 +357,7 @@ namespace RS.Snail.JJJ.utils
                 index++;
             }
 
-            IOHelper.SaveCSV(Tools.Common.Enums.CSVType.RobotData, ret, "zhouyi64");
+            IOHelper.SaveCSV(Tools.Common.Enums.CSVType.ResCSV, ret, "zhouyi64");
 
             return ret;
         }
@@ -530,7 +530,7 @@ namespace RS.Snail.JJJ.utils
                 }
             }
 
-            IOHelper.SaveCSV(Tools.Common.Enums.CSVType.RobotData, ret, "zhouyi64");
+            IOHelper.SaveCSV(Tools.Common.Enums.CSVType.ResCSV, ret, "zhouyi64");
         }
         #endregion
     }

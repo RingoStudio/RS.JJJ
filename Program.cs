@@ -19,16 +19,18 @@ public class Entry
     {
         bool isRestart = false;
         bool isTest = false;
+        bool isDebug = false;
         if (args.Length > 0)
         {
             foreach (var item in args)
             {
                 if (item == "restart") isRestart = true;
                 if (item == "test") isTest = true;
+                if (item == "debug") isDebug = true;
             }
         }
 
-        _context = new Context(isRestart, isTest);
+        _context = new Context(isRestart, isTest, isDebug);
         await Input();
     }
 

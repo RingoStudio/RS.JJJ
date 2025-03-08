@@ -3,6 +3,7 @@ using RS.Snail.JJJ.boot;
 using RS.Snail.JJJ.Client.core.res.communicate;
 using RS.Snail.JJJ.clone;
 using RS.Snail.JJJ.robot.cmd;
+using RS.Snail.JJJ.robot.include;
 using RS.Tools.Common.Utils;
 using RS.WechatFerry.model;
 using System;
@@ -82,7 +83,15 @@ namespace RS.Snail.JJJ.robot.modules
             try
             {
                 //if (data.Sender != "wxid_4rcudy2bjq3422" && !data.Content.Contains("所有人")) return;
-                //Console.WriteLine(data.GetDesc());
+                //if (data.Sender == "ringoo")
+                //{
+                //    if (data.MessageType == Tools.Common.Enums.WechatMessageType.AppCard)
+                //    {
+                //        var msgid = data.ID;
+                //        _context.WechatM.ForwardMsg(msgid, data.RoomID);
+                //    }
+                //    Console.WriteLine(data.GetDesc());
+                //}
                 var message = new Message(data, _context.WechatM.SelfWXID());
                 _messageQueue.Enqueue(message);
                 if (!GetTreatingStat()) TreatMessages();
@@ -215,8 +224,27 @@ namespace RS.Snail.JJJ.robot.modules
 
                 if (message.IsCallingJijiji && _context.ContactsM.QueryRole(message.Sender, message.RoomID) >= include.UserRole.NORMAL)
                 {
-                    if (message.IsAtAll) _context.WechatM.SendText("我不[抠鼻]", message.RoomID);
+                    if (message.IsAtAll)
+                    {
+                        if (message.Sender == "guoyi142159")
+                        {
+                            // 跳姐专用响应
+                            _context.WechatM.SendText("好的跳姐[好的]", message.RoomID);
 
+                        }
+                        else
+                        {
+                            // 随机
+                            if (message.MsgID % 2 == 0)
+                            {
+                                _context.WechatM.SendText($"我不[抠鼻]", message.RoomID);
+                            }
+                            else
+                            {
+                                _context.WechatM.SendText($"收到[好的]", message.RoomID);
+                            }
+                        }
+                    }
                     else CommonConversation(message, message.IsCallingJijiji);
                 }
             }

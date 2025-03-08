@@ -41,7 +41,7 @@ namespace RS.Snail.JJJ.robot.cmd.mayday
                 }
                 else
                 {
-                    var fileName = $"OUT\\门票列表_@{_context.ContactsM.QueryGroupMemberNick(msg.Sender, msg.RoomID)}_{DateTime.Now.ToString("yyyy_MM_dd_HH_mm_ss")}.txt";
+                    var fileName = $"OUT\\门票列表_@{RS.Snail.JJJ.utils.Utils.GetNickNameForFileName( _context.ContactsM.QueryGroupMemberNick(msg.Sender, msg.RoomID))}_{DateTime.Now.ToString("yyyy_MM_dd_HH_mm_ss")}.txt";
                     fileName = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, fileName);
                     System.IO.File.WriteAllText(fileName, content);
                     _context.WechatM.SendFile(fileName, msg.RoomID);

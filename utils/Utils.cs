@@ -1,4 +1,5 @@
-﻿using System;
+﻿using RS.Tools.Common.Utils;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -48,6 +49,27 @@ namespace RS.Snail.JJJ.utils
             }
 
             return nick;
+        }
+        /// <summary>
+        /// 将给定的文件拷贝到USER/CACHE目录中，若重名，自动用序号顺延防止覆盖
+        /// </summary>
+        /// <param name="oriPath"></param>
+        /// <returns></returns>
+        public static string SaveReceivedFile(string oriPath)
+        {
+            if (string.IsNullOrEmpty(oriPath) || !System.IO.File.Exists(oriPath)) return oriPath;
+            var fileName = IOHelper.GetFileNameWithoutExtension(oriPath);
+            var extensionName = IOHelper.GetExtension(oriPath);
+            var targetPath = "";
+            int index = 0;
+            do
+            {
+                targetPath = index == 0 ? Path.Join("USER\\CACHE", $"{fileName}.{extensionName}") : Path.Join("USER\\CACHE", $"{fileName}({index}).{extensionName}");
+                if (!System.IO.File.Exists(targetPath)) break;
+                index++;
+            } while (true);
+            System.IO.File.Copy(oriPath, targetPath, true);
+            return targetPath;
         }
     }
 }

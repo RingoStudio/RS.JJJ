@@ -38,13 +38,13 @@ namespace RS.Snail.JJJ.robot.modules
         private void RegistBackup()
         {
             _context.BackupM.RegistSaveSessions(ModuleName, SaveCSV);
-            _context.BackupM.RemoveBackupSession(Tools.Common.Enums.CSVType.RobotData, include.files.Update_Time);
+            _context.BackupM.RemoveBackupSession(Tools.Common.Enums.CSVType.UserData, include.files.Update_Time);
         }
         private void LoadCSV()
         {
             #region UPDATE TIME
             _cdCache = new();
-            dynamic data = IOHelper.GetCSV(Tools.Common.Enums.CSVType.RobotData, include.files.Update_Time);
+            dynamic data = IOHelper.GetCSV(Tools.Common.Enums.CSVType.UserData, include.files.Update_Time);
             foreach (var item in JSONHelper.ParseDicStrLong(data))
             {
                 _cdCache[item.Key] = item.Value;
@@ -57,7 +57,7 @@ namespace RS.Snail.JJJ.robot.modules
             dynamic jo = JObject.FromObject(_cdCache);
             try
             {
-                IOHelper.SaveCSV(Tools.Common.Enums.CSVType.RobotData, jo, include.files.Update_Time);
+                IOHelper.SaveCSV(Tools.Common.Enums.CSVType.UserData, jo, include.files.Update_Time);
             }
             catch (Exception ex)
             {

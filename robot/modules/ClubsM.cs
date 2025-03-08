@@ -63,8 +63,8 @@ namespace RS.Snail.JJJ.robot.modules
         private void RegistBackups()
         {
             _context.BackupM.RegistSaveSessions(ModuleName, SaveCSV);
-            _context.BackupM.RegistBackupSession(Tools.Common.Enums.CSVType.RobotData, include.files.Club_Data_CSV);
-            _context.BackupM.RegistBackupSession(Tools.Common.Enums.CSVType.RobotData, include.files.Club_Members_CSV);
+            _context.BackupM.RegistBackupSession(Tools.Common.Enums.CSVType.UserClub, include.files.Club_Data_CSV);
+            _context.BackupM.RegistBackupSession(Tools.Common.Enums.CSVType.UserClub, include.files.Club_Members_CSV);
         }
         /// <summary>
         ///  加载CSV
@@ -75,7 +75,7 @@ namespace RS.Snail.JJJ.robot.modules
             #region CLUBS
             try
             {
-                data = IOHelper.GetCSV(Tools.Common.Enums.CSVType.RobotData, include.files.Club_Data_CSV) ?? new JObject();
+                data = IOHelper.GetCSV(Tools.Common.Enums.CSVType.UserClub, include.files.Club_Data_CSV) ?? new JObject();
                 _clubs = new();
                 foreach (var item in data)
                 {
@@ -91,7 +91,7 @@ namespace RS.Snail.JJJ.robot.modules
             #region MEMBERS
             try
             {
-                data = IOHelper.GetCSV(Tools.Common.Enums.CSVType.RobotData, include.files.Club_Members_CSV) ?? new JObject();
+                data = IOHelper.GetCSV(Tools.Common.Enums.CSVType.UserClub, include.files.Club_Members_CSV) ?? new JObject();
                 _clubMembers = new();
                 foreach (var item in data)
                 {
@@ -117,7 +117,7 @@ namespace RS.Snail.JJJ.robot.modules
                 {
                     jo[item.Key] = item.Value.GetJO();
                 }
-                IOHelper.SaveCSV(RS.Tools.Common.Enums.CSVType.RobotData, jo, include.files.Club_Data_CSV);
+                IOHelper.SaveCSV(RS.Tools.Common.Enums.CSVType.UserClub, jo, include.files.Club_Data_CSV);
 
                 Console.WriteLine(">> 已保存 Clubs");
             }
@@ -133,7 +133,7 @@ namespace RS.Snail.JJJ.robot.modules
                 {
                     jo[item.Key] = item.Value.GetJO();
                 }
-                IOHelper.SaveCSV(RS.Tools.Common.Enums.CSVType.RobotData, jo, include.files.Club_Members_CSV);
+                IOHelper.SaveCSV(RS.Tools.Common.Enums.CSVType.UserClub, jo, include.files.Club_Members_CSV);
                 Console.WriteLine(">> 已保存 ClubMembers");
             }
             catch (Exception ex)
@@ -243,6 +243,7 @@ namespace RS.Snail.JJJ.robot.modules
 
                 // uid count
                 ret.Add($"UID绑定数量: {uids.Count}/{club.Members.Count}");
+                if (club.Level > 0) ret.Add($"成员数量: {uids.Count}/{club.MaxMemberNum} ({club.Level}级)");
             }
 
             ret.Add("");
@@ -342,12 +343,12 @@ namespace RS.Snail.JJJ.robot.modules
                         var remindList = new List<string>();
                         if (memberChange.removedMembers.Count > 0)
                         {
-                            remindList.Add($"发现以下 {memberChange.removedMembers} 个成员退出本俱乐部");
+                            remindList.Add($"发现以下 {memberChange.removedMembers.Count} 个成员退出本俱乐部:");
                             remindList.AddRange(memberChange.removedMembers.Select(a => QueryMemberName(a) ?? a));
                         }
                         if (memberChange.newMembers.Count > 0)
                         {
-                            remindList.Add($"发现以下 {memberChange.newMembers.Count} 个成员新加入本俱乐部");
+                            remindList.Add($"发现以下 {memberChange.newMembers.Count} 个成员新加入本俱乐部:");
                             remindList.AddRange(memberChange.newMembers.Select(a => QueryMemberName(a) ?? a));
                         }
 
@@ -736,6 +737,10 @@ namespace RS.Snail.JJJ.robot.modules
                                     "领导力",
                                     "演练实力",
 
+                                    "本周活跃度",
+                                    "游戏时长",
+                                    "基因强度",
+
                                     "生命",
                                     "攻击",
                                     "防御",
@@ -890,6 +895,11 @@ namespace RS.Snail.JJJ.robot.modules
                         JSONHelper.ParseInt(member.Query("leadership")).ToString(),
                         JSONHelper.ParseLong(member.Query("son_combat")).ToString(),
 
+                        JSONHelper.ParseLong(member.Query("vitality")).ToString(),
+                        JSONHelper.ParseLong(member.Query("login_days")).ToString(),
+                        JSONHelper.ParseLong(member.Query("dna_impact")).ToString(),
+
+
                         JSONHelper.ParseLong(member.Query("max_hp")).ToString(),
                         JSONHelper.ParseLong(member.Query("attack")).ToString(),
                         JSONHelper.ParseLong(member.Query("defense")).ToString(),
@@ -1010,7 +1020,8 @@ namespace RS.Snail.JJJ.robot.modules
                     {
                         bool isSupply = !JSONHelper.ParseBool(member.Query("gw/not_supply"));
                         bool isAuction = !JSONHelper.ParseBool(member.Query("gw/lack_auction"));
-                        var blockName = (isAuction ? "" : "[red]") + JSONHelper.ParseString(member.Query("gw/block_name"));
+                        var blockName = (((!club.Spe4DontNeedAuction) && isAuction) ? "" : "[red]") + JSONHelper.ParseString(member.Query("gw/block_name"));
+
                         var chapter = JSONHelper.ParseInt(member.Query("gw/chapter"));
                         var dice = JSONHelper.ParseInt(member.Query("gw/dice"));
                         var redDice = JSONHelper.ParseInt(member.Query("gw/red_dice"));
@@ -2221,21 +2232,34 @@ namespace RS.Snail.JJJ.robot.modules
             if (weekday == 5) return "周五就好好休息，别管挖矿啦。";
 
             var now = TimeHelper.ToTimeStamp();
-
             var desc = new List<string>();
             foreach (var uid in groupMember.UIDs)
             {
                 var member = FindMember(uid);
                 if (member is null) continue;
+
+                string pos = JSONHelper.ParseString(member.Query("mine_pos"));
+
                 var dest = JSONHelper.ParseLong(member.Query("mine_dest"));
                 var destDesc = "";
+                bool isFarDest = false;
+
+                // 内容 [昵称]
+                desc.Add($"[{member.NameOrUID()}]");
+
                 if (dest == 0) destDesc = $"{emoji.YIWEN}正在跳矿或不在矿中";
                 else if (dest <= now) destDesc = $"{emoji.BAOZHA}已超时{TimeHelper.ChinsesTimeDurationDesc(now - dest)}";
                 else if (dest <= now + 86400) destDesc = $"{emoji.NAOZHONG}还剩{TimeHelper.ChinsesTimeDurationDesc(dest - now)}";
-                else destDesc = $"到期时间{TimeHelper.ChineseTimeDescWithWeekday(dest)}";
+                else
+                {
+                    destDesc = $"到期时间{TimeHelper.ChineseTimeDescWithWeekday(dest)}";
+                    isFarDest = true;
+                }
+                // 内容 正在跳矿或不在矿中/已超时/还剩
+                if (isFarDest) desc.Add($"{emoji.RIGHT}{TimeHelper.ChineseTimeDescWithWeekday(dest)}");
+                else { desc.Add(destDesc); desc.Add($"{emoji.RIGHT}{TimeHelper.ChineseTimeDescWithWeekday(dest)}"); }
 
-                desc.Add($"[{member.NameOrUID()}]\n{destDesc}");
-                string pos = JSONHelper.ParseString(member.Query("mine_pos"));
+
                 if (!string.IsNullOrEmpty(pos))
                 {
                     desc.Add($"{emoji.LOCATION}位置：{pos}");
@@ -2901,6 +2925,32 @@ namespace RS.Snail.JJJ.robot.modules
             return (result, null);
         }
         /// <summary>
+        /// 提醒钻头未达标
+        /// </summary>
+        /// <param name="rid"></param>
+        /// <param name="chatroom"></param>
+        /// <param name="sender"></param>
+        /// <param name="notice"></param>
+        /// <returns></returns>
+        public (bool result, string? desc) RemindGroupWarDrillLack(string rid, string chatroom, string sender)
+        {
+            var ret = new List<(List<string> wxids, string content)>();
+            var club = FindClub(rid);
+            if (club is null) return (false, "未找到俱乐部");
+            if (!club.IsTodayUpdated()) return (false, "今天还没更新过物种数据，请先登录一次再发起提醒");
+            var weekday = RS.Snail.JJJ.Client.core.game.module.TimeM.GetWeekDayStatic();
+            if (weekday == 5) return (false, "周五就不要提醒啦~");
+
+
+            if (club.DrillUseLimit1 <= 0 || club.DrillUseLimit2 <= 0) return (false, "您还没有设定俱乐部钻头达标数量。请发送\"设置钻头达标数量\"指令进行设定");
+            var data = QueryGroupWarDrillRemind(club, include.DrillQueryType.LACK);
+            if (data.Count > ClubRemidMaxCount(club)) return (false, "要发出的提醒太多，建议直接@所有人");
+
+            var result = SendRemindContent(club, data, chatroom, sender);
+
+            return (result, null);
+        }
+        /// <summary>
         /// 提醒物种历史
         /// </summary>
         /// <param name="rid"></param>
@@ -3410,7 +3460,7 @@ namespace RS.Snail.JJJ.robot.modules
                     _list.Add($"还剩{dice}个红骰子");
 
                 }
-                if ((weekday >= 7 || weekday <= 3) && _notAuction > 0)
+                if ((!club.Spe4DontNeedAuction) && (weekday >= 7 || weekday <= 3) && _notAuction > 0)
                 {
                     notAuction++;
                     _list.Add($"今天没参与拍卖");
@@ -4176,7 +4226,7 @@ namespace RS.Snail.JJJ.robot.modules
                     else ret[uid].Add($"{include.emoji.SPE4}仓鼠骰子没用完");
                 }
 
-                if (_notAuction > 0 && (weekday >= 7 || weekday <= 3) && (!isAuto || hour >= 20))
+                if ((!club.Spe4DontNeedAuction) && _notAuction > 0 && (weekday >= 7 || weekday <= 3) && (!isAuto || hour >= 20))
                 {
                     if (!ret.ContainsKey(uid)) ret.Add(uid, new());
                     if (club.RemindContentNotCombine) ret[uid].Add($"{include.emoji.SPE4}仓鼠没参加拍卖");
@@ -4376,30 +4426,30 @@ namespace RS.Snail.JJJ.robot.modules
                             var oriCount = wxidUIDs[wxid].Count;
                             var curCount = member.Value.Count;
                             var wxNick = _context.ContactsM.QueryGroupMemberNick(wxid, group.WXID);
-                            if (oriCount > 1)
-                            {
-                                if (oriCount == curCount)
-                                {
+                            //if (oriCount > 1)
+                            //{
+                            //    if (oriCount == curCount)
+                            //    {
 
-                                    // 一个人的所有角色提示
-                                    subContent = $"@{wxNick}{chars.AtSpliter}(所有角色)";
-                                }
-                                else
-                                {
-                                    var nicks = new List<string>();
-                                    foreach (var uid in member.Value)
-                                    {
-                                        // 一个人的非所有角色提示
-                                        nicks.Add($"{QueryMemberName(uid)}");
-                                    }
-                                    subContent = $"@{wxNick}{chars.AtSpliter}({string.Join("，", nicks)})";
-                                }
-                            }
-                            else
+                            //        // 一个人的所有角色提示
+                            //        subContent = $"@{wxNick}{chars.AtSpliter}(所有角色)";
+                            //    }
+                            //    else
+                            //    {
+                            var nicks = new List<string>();
+                            foreach (var uid in member.Value)
                             {
-                                // 一个人仅有一个角色的提示
-                                subContent = $"@{wxNick}{chars.AtSpliter}";
+                                // 一个人的非所有角色提示
+                                nicks.Add($"{QueryMemberName(uid)}");
                             }
+                            subContent = $"@{wxNick}{chars.AtSpliter} [{string.Join("，", nicks)}]";
+                            //    }
+                            //}
+                            //else
+                            //{
+                            //    // 一个人仅有一个角色的提示
+                            //    subContent = $"@{wxNick}{chars.AtSpliter}";
+                            //}
                             if ((string.Join("\n", content.Last()).Length + subContent.Length) > 200)
                             {
                                 content.Add(new());
@@ -4411,7 +4461,7 @@ namespace RS.Snail.JJJ.robot.modules
                         for (int i = 0; i < content.Count; i++)
                         {
                             var indexDesc = content.Count > 1 ? $"({i + 1}/{content.Count})" : "";
-                            _context.WechatM.SendAtText($"{include.emoji.ZHUYI}{item.Key}{indexDesc}：\n{string.Join("，", content[i])}",
+                            _context.WechatM.SendAtText($"{include.emoji.ZHUYI}{item.Key}{indexDesc}：\n{string.Join("\n", content[i])}",
                                                          ats[i],
                                                          chatroom,
                                                          false);

@@ -40,15 +40,15 @@ namespace RS.Snail.JJJ.robot.cmd.misc
             {
                 _context.CommunicateM.UnregistWaitMessageRequest(msg.RoomID, msg.Sender, _continueTag);
                 var arr = msg.ExplodeContent;
-                if (arr.Length < 2) return;
+                // if (arr.Length < 2) return;
                 var instru = arr.First();
                 var bc = new BroadCast(msg);
-                bc.Content.Add(msg.Content.Substring(instru.Length).Trim());
+                if (arr.Length > 1) bc.Content.Add(msg.Content.Substring(instru.Length).Trim());
                 if (_broadCasts.ContainsKey(bc.ID)) _broadCasts[bc.ID] = bc;
                 else _broadCasts.TryAdd(bc.ID, bc);
 
                 _context.WechatM.SendAtText("请发送\"确定\"立即向绑定俱乐部的群发出以上广播内容。\n" +
-                                           "若想要添加文本/文件/图片，请在此发送。\n" +
+                                           "广播支持添加文本/文件/图片/APP卡片/聊天记录，请在此发送。\n" +
                                            "你最多可以发送不超过500字的文本，和最多3个附件。\n" +
                                            "若想终止以上广播，请发送\"取消\"。\n" +
                                            "以上操作20秒内有效，超时未回复将自动终止发送。",
@@ -66,7 +66,7 @@ namespace RS.Snail.JJJ.robot.cmd.misc
         {
             var descs = new List<string>();
             if (textLength < _maxLength) descs.Add($"文本({textLength}/{_maxLength})");
-            if (attachCount < _maxCount) descs.Add($"图片文件({attachCount}/{_maxCount})");
+            if (attachCount < _maxCount) descs.Add($"附件({attachCount}/{_maxCount})");
             if (descs.Count > 0) return $"你可以继续添加 {string.Join("和", descs)}，请在此发送。\n";
             else return "";
         }
@@ -123,7 +123,7 @@ namespace RS.Snail.JJJ.robot.cmd.misc
                     }
                     else if (msg.Content == "确定")
                     {
-                        SendBroadCasts(msg, bc.Content, bc.Images, bc.Files);
+                        SendBroadCasts(msg, bc.Content, bc.Images, bc.Files, bc.Attachs);
                         return;
                     }
                     else
@@ -245,6 +245,34 @@ namespace RS.Snail.JJJ.robot.cmd.misc
                         Loops(msg);
                     }
                 }
+                else if (msg.Type == Tools.Common.Enums.WechatMessageType.AppCard || msg.Type == WechatMessageType.ChatHistory)
+                {
+                    // app卡片/聊天记录
+                    var msgID = msg.MsgID;
+                    if (bc.Attachs.Contains(msgID))
+                    {
+                        _context.WechatM.SendAtText($"你发送了重复的附件，请重新发送。\n" +
+                                              "请发送\"确定\"立即发出以上广播内容。\n" +
+                                              AttackDesc(bc.ContentLength, bc.AttachCount) +
+                                              "若想终止以上广播，请发送\"取消\"。\n" +
+                                              "以上操作20秒内有效，超时未回复将自动终止发送。",
+                                              new List<string> { msg.Sender },
+                                              msg.RoomID);
+                        Loops(msg);
+                    }
+                    else
+                    {
+                        bc.Attachs.Add(msgID);
+                        _context.WechatM.SendAtText($"成功接收附件。\n" +
+                                                      "请发送\"确定\"立即发出以上广播内容。\n" +
+                                                      AttackDesc(bc.ContentLength, bc.AttachCount) +
+                                                      "若想终止以上广播，请发送\"取消\"。\n" +
+                                                      "以上操作20秒内有效，超时未回复将自动终止发送。",
+                                                      new List<string> { msg.Sender },
+                                                      msg.RoomID);
+                        Loops(msg);
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -263,7 +291,7 @@ namespace RS.Snail.JJJ.robot.cmd.misc
         /// <param name="texts"></param>
         /// <param name="images"></param>
         /// <param name="files"></param>
-        private void SendBroadCasts(Message msg, List<string> texts, List<string> images, List<string> files)
+        private void SendBroadCasts(Message msg, List<string> texts, List<string> images, List<string> files, List<ulong> attachs)
         {
             try
             {
@@ -278,6 +306,10 @@ namespace RS.Snail.JJJ.robot.cmd.misc
                     foreach (var path in files)
                     {
                         _context.WechatM.SendFile(path, chatroom);
+                    }
+                    foreach (var id in attachs)
+                    {
+                        _context.WechatM.ForwardMsg(id, chatroom);
                     }
                 }
             }

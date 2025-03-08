@@ -2,8 +2,8 @@
 
 ## 更新内容
 ### 2024.11.9 JJJ更新内容
-1. 增加“查询微信群总览”指令，可查询微信群内成员与俱乐部成员之间的绑定关系。
-2. 增加“设置北极贝需要买卷轴 开/关” 指令，若设置为开，该俱乐部未使用白蝌蚪购买卷轴的成员将会被提醒或标出。
+1. 增加"查询微信群总览"指令，可查询微信群内成员与俱乐部成员之间的绑定关系。
+2. 增加"设置北极贝需要买卷轴 开/关" 指令，若设置为开，该俱乐部未使用白蝌蚪购买卷轴的成员将会被提醒或标出。
 3. 修复北极贝历史数据缺失。
 4. 每次启动JJJ时，清空OUT文件夹下三天前的文件。
 5. 完善权限缓存，配置会长、经理、成员时清空相应缓存。
@@ -11,8 +11,8 @@
 ### 2024.11.10 JJJ更新内容
 1. 统一自动登录时间，周四最后一次改为22:00，其他日期最后一次改为20:00。
 2. 增加"自动登录配置表"以及"上传自动配置表"命令，通过使用这两个命令，用户可以通过填写和上传一个excel表格实现自动登录时间及自动提醒内容的自定义。
-   2.1 未进行唧唧叽自动登录设置表的俱乐部，可以继续按照原有设定进行”设置自动登录/设置自动提醒/设置自动提醒物种历史等。
-   2.2 进行过唧唧叽自动登录设置表配置的俱乐部中，”设置自动登录“ 将启动和取消所有配置表内的登录时间点；”设置自动提醒/设置自动提醒物种历史/设置自动提醒挖矿/设置自动提醒金银牌“指令将只影响手动登录后的自动提醒，自动登录的提醒需要使用”设置自动登录配置“提交本表进行具体配置。
+   2.1 未进行唧唧叽自动登录设置表的俱乐部，可以继续按照原有设定进行"设置自动登录/设置自动提醒/设置自动提醒物种历史等。
+   2.2 进行过唧唧叽自动登录设置表配置的俱乐部中，"设置自动登录" 将启动和取消所有配置表内的登录时间点；"设置自动提醒/设置自动提醒物种历史/设置自动提醒挖矿/设置自动提醒金银牌"指令将只影响手动登录后的自动提醒，自动登录的提醒需要使用"设置自动登录配置"提交本表进行具体配置。
    2.3 通过发送"查看俱乐部"可快速查看自动登录配置表中的内容。
 3. 增强对成员积分清单收包的检测，降低出现部分成员金银牌和挖矿不准的概率。
 4. 修复当"设置登录提示会长"设置为关时，依然在自动提醒时at会长的问题。
@@ -51,3 +51,72 @@
 ### 2024.11.21 19:00 JJJ更新内容
 1. 优化微信消息合并逻辑，现可合并发出@消息，并且可以连续发出不多于9个文件或图片。
 2. 贵重搜索支持"光环重伤率"查询。
+
+### 2024.11.30 18:40 JJJ更新内容
+1. 修复周六蜣螂历史未参与的成员不被识别的问题（需重新登录以刷新数据）。
+2. 修复"查询领错套装"命令无法正常查询的问题。
+3. 修复登录后提示退出俱乐部成员显示异常的问题。 
+
+### 2024.12.06 18:46 JJJ更新内容
+1. 增加了守护跳姐功能。
+2. 修复了由dis文件缓存导致的ios服登录时提示"更新客户端"的问题。
+3. 广播可发送APP卡片。
+4. 发送广播指令时可不跟文本内容，以便直接群发附件。
+
+### 2024.12.08 17:35 JJJ更新内容
+1. 修复了由于区服模块（ServerDistM）初始化问题导致的登录失败。
+
+### 2025.01.13 15:00 JJJ更新内容
+1. 在"查询物种总览"表格中增加"本周活跃度"、"游戏时长"、"基因强度"三列，以满足部分俱乐部管理需要。
+2. 在所有合并提醒发出时，每个at的微信名称后面都增加标注对应的游戏角色名称。
+3. 增加"提醒钻头达标"命令，俱乐部进行了"设置钻头达标数量"配置后，发送此指令可立即提醒每个使用钻头数量未达标的俱乐部成员。
+
+### 2025.01.16 13:25 JJJ更新内容
+1. 适配微信版本V3.9.11.25。
+2. 在"我的矿"和"看看矿"的查询内容中增加到期时间显示，例如"➡️周四18:30"。
+
+### 2025.02.28 21:37 JJJ更新内容
+1. 增加"设置仓鼠需要参加拍卖 开/关" 指令，若设置为开，该俱乐部未参与仓鼠拍卖成员将会被提醒或标出。
+2. 修复部分微信群"刷新群信息"无效的问题。
+
+### 2025.03.01 15:00 JJJ更新内容
+1. 优化"我的矿"查询结果显示格式。
+
+### 2025.03.08 23:00 JJJ更新内容
+1. 适配WCF版本v3.9.4.1, 微信版本V3.9.12.17，性能更佳。
+2. 将"更新对话"中接收到的文件另存到"USER\CACHE"路径中，防止被微信自行清理。
+3. 将OSSHelper中硬编码的OSS密钥放在BOT\oss.ini文件中，防止在github中泄密。
+4. 整理BOT路径下的存档文件：
+[NEW]
+BOT\oss.ini
+
+[MIGRATE]
+BOT\cdkey2.res -> USER\DATA\cdkey2.res
+BOT\conversation.res -> USER\DATA\conversation.res
+BOT\device_info_android.res -> USER\DATA\device_info_android.res
+BOT\device_info_ios.res -> USER\DATA\device_info_ios.res
+BOT\dislists.res -> USER\DATA\dislists.res
+BOT\mayday.res -> USER\DATA\mayday.res
+BOT\qcsdk_tokens.res -> USER\DATA\qcsdk_tokens.res
+BOT\qian_cache.res -> USER\DATA\qian_cache.res
+BOT\questionnaire.res -> USER\DATA\questionnaire.res
+
+BOT\club_data.res -> USER\CLUB\club_data.res
+BOT\club_members.res -> USER\CLUB\club_members.res
+BOT\group_data.res -> USER\CLUB\group_data.res
+BOT\gw_events.res -> USER\CLUB\gw_events.res
+BOT\role_cache.res -> USER\CLUB\role_cache.res
+BOT\user_data.res -> USER\CLUB\user_data.res
+
+BOT\visitor.res -> RES\CSV\visitor.res
+BOT\zhouyi64.res -> RES\CSV\zhouyi64.res
+BOT\qian.txt -> RES\CSV\qian.txt
+
+BOT\jjj_instruction_simple_cover.png -> IMG\jjj\jjj_instruction_simple_cover.png
+BOT\jjj_instruction_cover2.png -> IMG\jjj\jjj_instruction_cover2.png
+BOT\jjj_instruction_cover.png -> IMG\jjj\jjj_instruction_cover.png
+BOT\gw_kit.png -> IMG\jjj\gw_kit.png
+BOT\gw_event_sum_list.png -> IMG\jjj\gw_event_sum_list.png
+BOT\gw_event_multi_list.png -> IMG\jjj\gw_event_multi_list.png
+BOT\gw_event_mine_list.png -> IMG\jjj\gw_event_mine_list.png
+BOT\gw_event_boss_list.png -> IMG\jjj\gw_event_boss_list.png

@@ -46,12 +46,12 @@ namespace RS.Snail.JJJ.robot.modules
         private void RegistBackup()
         {
             _context.BackupM.RegistSaveSessions(ModuleName, SaveCSV);
-            _context.BackupM.RemoveBackupSession(Tools.Common.Enums.CSVType.RobotData, include.files.GroupWar_Events_CSV);
+            _context.BackupM.RemoveBackupSession(Tools.Common.Enums.CSVType.UserClub, include.files.GroupWar_Events_CSV);
         }
         private void LoadCSV()
         {
             _events = new();
-            var data = IOHelper.GetCSV(Tools.Common.Enums.CSVType.RobotData, include.files.GroupWar_Events_CSV) ?? new JObject();
+            var data = IOHelper.GetCSV(Tools.Common.Enums.CSVType.UserClub, include.files.GroupWar_Events_CSV) ?? new JObject();
             foreach (var item in data)
             {
                 var one = new ClubEvents(item.Value);
@@ -69,7 +69,7 @@ namespace RS.Snail.JJJ.robot.modules
             }
             try
             {
-                IOHelper.SaveCSV(Tools.Common.Enums.CSVType.RobotData, jo, include.files.GroupWar_Events_CSV);
+                IOHelper.SaveCSV(Tools.Common.Enums.CSVType.UserClub, jo, include.files.GroupWar_Events_CSV);
             }
             catch (Exception ex)
             {

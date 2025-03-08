@@ -20,7 +20,7 @@ namespace RS.Snail.JJJ.robot.cmd.club
         {
             _context = context;
         }
-        public List<string> Commands => new List<string> { "查询物种总览" };
+        public List<string> Commands => new List<string> { "查询物种总览", "查询物种历史总览" };
         public List<string> CommandsJP { get => Commands.Select(a => Pinyin.GetInitials(a).ToLower()).ToList(); }
         public List<string> CommandsQP { get => Commands.Select(a => Pinyin.GetPinyin(a).ToLower()).ToList(); }
         public string Tag => "cmd_query_group_war_excel";

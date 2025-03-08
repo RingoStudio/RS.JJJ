@@ -45,7 +45,7 @@ namespace RS.Snail.JJJ.robot.modules
         private void RegistBackup()
         {
             _context.BackupM.RegistSaveSessions(ModuleName, SaveCSV);
-            _context.BackupM.RemoveBackupSession(Tools.Common.Enums.CSVType.RobotData, "qian_cache");
+            _context.BackupM.RemoveBackupSession(Tools.Common.Enums.CSVType.UserData, "qian_cache");
         }
         private void LoadCSV()
         {
@@ -80,7 +80,7 @@ namespace RS.Snail.JJJ.robot.modules
 
             // 缓存
             _qianCache = new();
-            var jo = IOHelper.GetCSV(Tools.Common.Enums.CSVType.RobotData, "qian_cache") ?? new JObject();
+            var jo = IOHelper.GetCSV(Tools.Common.Enums.CSVType.UserData, "qian_cache") ?? new JObject();
             foreach (var item in jo)
             {
                 var wxid = item.Name;
@@ -112,7 +112,7 @@ namespace RS.Snail.JJJ.robot.modules
                         time = item.Value.time
                     });
                 }
-                IOHelper.SaveCSV(Tools.Common.Enums.CSVType.RobotData, jo, "qian_cache");
+                IOHelper.SaveCSV(Tools.Common.Enums.CSVType.UserData, jo, "qian_cache");
             }
             catch (Exception ex)
             {

@@ -59,7 +59,7 @@ namespace RS.Snail.JJJ.robot.modules
             _conversations = new();
             try
             {
-                var data = IOHelper.GetCSV(Tools.Common.Enums.CSVType.RobotData, include.files.Conversation_CSV) ?? new JObject();
+                var data = IOHelper.GetCSV(Tools.Common.Enums.CSVType.UserData, include.files.Conversation_CSV) ?? new JObject();
                 foreach (var groupItem in data)
                 {
                     string groupRID = groupItem.Name;
@@ -92,7 +92,7 @@ namespace RS.Snail.JJJ.robot.modules
                     }
                 }
                 dynamic jo = JObject.FromObject(dic);
-                IOHelper.SaveCSV(Tools.Common.Enums.CSVType.RobotData, jo, include.files.Conversation_CSV);
+                IOHelper.SaveCSV(Tools.Common.Enums.CSVType.UserData, jo, include.files.Conversation_CSV);
             }
             catch (Exception ex)
             {
@@ -104,7 +104,7 @@ namespace RS.Snail.JJJ.robot.modules
         private void RegistBackups()
         {
             _context.BackupM.RegistSaveSessions(ModuleName, SaveCSV);
-            _context.BackupM.RegistBackupSession(Tools.Common.Enums.CSVType.RobotData, include.files.Conversation_CSV);
+            _context.BackupM.RegistBackupSession(Tools.Common.Enums.CSVType.UserData, include.files.Conversation_CSV);
         }
         #endregion
 
